@@ -45,8 +45,6 @@ Spring Boot를 사용하여 간단한 인사말을 반환하는 REST API 프로�
 
 ## 4. 실행 및 검증 결과
 
-다음 항목은 실제 실행 후 확인할 예정입니다.
-
 - [x] `GET /hello` — HTTP 200 및 응답 확인
 - [x] `GET /greet?name=민지` — HTTP 200 및 응답 확인
 - [x] `GET /greet` — HTTP 200 및 기본값 확인
