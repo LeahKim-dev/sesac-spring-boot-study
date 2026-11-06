@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>스터디 참가 신청</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172b40; background: #f2f6fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 960px; margin: 48px auto; padding: 0 20px; }
+    h1 { margin-bottom: 12px; font-size: 2rem; }
+    h2 { margin-top: 0; font-size: 1.2rem; }
+    p { line-height: 1.7; }
+    .intro, .hint { color: #526477; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    section, .notice { background: white; border: 1px solid #dce5ee; border-radius: 16px; padding: 24px; margin-top: 20px; }
+    .grid section { margin-top: 0; }
+    label { display: block; margin-bottom: 8px; font-weight: 600; }
+    input, button { font: inherit; border-radius: 8px; }
+    input { width: 100%; min-height: 44px; border: 1px solid #9cabbc; padding: 10px; }
+    button { min-height: 44px; border: 0; background: #2258b7; color: white; padding: 10px 16px; cursor: pointer; }
+    form button { width: 100%; margin-top: 12px; }
+    button:disabled { opacity: .55; cursor: wait; }
+    :focus-visible { outline: 3px solid #e5a51b; outline-offset: 3px; }
+    .hint { font-size: .88rem; margin-bottom: 0; }
+    .list-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .list-heading h2 { margin: 0; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; text-align: left; }
+    th, td { padding: 14px 10px; border-bottom: 1px solid #e1e8ef; overflow-wrap: anywhere; }
+    th { color: #526477; }
+    .badge { display: inline-block; border-radius: 20px; padding: 4px 10px; white-space: nowrap; background: #e8efff; color: #224c9b; }
+    .waiting { background: #fff1d5; color: #795000; }
+    #result { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 0; }
+    #result[data-error="true"] { color: #aa2533; }
+    @media (max-width: 720px) { main { margin-top: 28px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>함께 배우는 스터디</h1>
+    <p class="intro">이름으로 참가를 신청하세요. 정원이 차면 대기자로 등록되며, 빈자리가 생기면 신청 순서대로 확정됩니다.</p>
+  </header>
+  <div class="grid">
+    <section aria-labelledby="join-title">
+      <h2 id="join-title">참가 신청</h2>
+      <form id="join-form">
+        <label for="name">이름</label>
+        <input id="name" name="name" required autocomplete="name" placeholder="예: 김민지">
+        <button type="submit">참가 신청하기</button>
+      </form>
+      <p class="hint">같은 이름으로 중복 신청할 수 없습니다.</p>
+    </section>
+    <section aria-labelledby="cancel-title">
+      <h2 id="cancel-title">참가 취소</h2>
+      <form id="cancel-form">
+        <label for="memberId">참가 ID</label>
+        <input id="memberId" name="memberId" required inputmode="numeric" pattern="[0-9]+" placeholder="명단에서 ID 확인">
+        <button type="submit">참가 취소하기</button>
+      </form>
+      <p class="hint">확정자가 취소하면 첫 대기자가 확정됩니다.</p>
+    </section>
+    <section aria-labelledby="capacity-title">
+      <h2 id="capacity-title">정원 변경</h2>
+      <form id="capacity-form">
+        <label for="capacity">새 정원 (1~10명)</label>
+        <input id="capacity" name="capacity" type="number" min="1" max="10" step="1" required placeholder="예: 5">
+        <button type="submit">정원 변경하기</button>
+      </form>
+      <p class="hint">확정 인원보다 작게 줄일 수 없습니다. 현재 정원은 변경 요청 결과에서 확인할 수 있습니다.</p>
+    </section>
+  </div>
+  <div class="notice" role="status" aria-live="polite" aria-atomic="true">
+    <strong>처리 결과</strong>
+    <p id="result">신청·취소·정원 변경 결과를 여기에 표시합니다.</p>
+  </div>
+  <section aria-labelledby="list-title" id="participants-section">
+    <div class="list-heading">
+      <h2 id="list-title">참가자 명단</h2>
+      <button id="refresh" type="button">명단 새로고침</button>
+    </div>
+    <p id="list-summary" role="status">명단을 불러오는 중입니다.</p>
+    <div class="scroll">
+      <table>
+        <caption class="hint">참가 ID는 참가 취소 시 사용합니다.</caption>
+        <thead><tr><th scope="col">참가 ID</th><th scope="col">이름</th><th scope="col">상태</th></tr></thead>
+        <tbody id="participants"></tbody>
+      </table>
+    </div>
+    <p class="hint">명단은 서버 메모리에 저장되므로 서버를 재시작하면 초기화됩니다.</p>
+  </section>
+  <noscript><p>이 화면을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</p></noscript>
+</main>
+<script>
+  const result = document.querySelector('#result');
+  const rows = document.querySelector('#participants');
+  const summary = document.querySelector('#list-summary');
+  let busy = false;
+
+  function showResult(message, isError = false) {
+    // 서버 응답과 이름을 HTML로 해석하지 않고 안전하게 글자로 표시합니다.
+    result.textContent = message;
+    result.dataset.error = String(isError);
+  }
+
+  // 서버가 문자열을 반환하므로 json()이 아닌 text()로 읽습니다.
+  async function request(url, options = {}) {
+    const response = await fetch(url, { cache: 'no-store', ...options });
+    if (!response.ok) throw new Error(`서버 요청 실패 (HTTP ${response.status})`);
+    return response.text();
+  }
+
+  async function loadParticipants() {
+    const text = await request('/study/participants');
+    const members = [];
+    if (text.trim() !== '참가자가 없습니다.') {
+      for (const line of text.trimEnd().split('\n')) {
+        // 이름에 /가 있어도 마지막 / 뒤의 상태와 첫 / 앞의 ID를 구분합니다.
+        const match = line.replace(/\r$/, '').match(/^(\d+)\/(.*)\/(CONFIRMED|WAITING)$/);
+        if (!match) throw new Error('명단 응답 형식을 확인할 수 없습니다.');
+        members.push({ id: match[1], name: match[2], status: match[3] });
+      }
+    }
+    const fragment = document.createDocumentFragment();
+    for (const member of members) {
+      const row = document.createElement('tr');
+      for (const value of [member.id, member.name]) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      }
+      const cell = document.createElement('td');
+      const badge = document.createElement('span');
+      const waiting = member.status === 'WAITING';
+      badge.className = waiting ? 'badge waiting' : 'badge';
+      badge.textContent = waiting ? '대기' : '확정';
+      cell.append(badge);
+      row.append(cell);
+      fragment.append(row);
+    }
+    rows.replaceChildren(fragment);
+    const confirmed = members.filter(member => member.status === 'CONFIRMED').length;
+    summary.textContent = members.length
+      ? `전체 ${members.length}명 · 확정 ${confirmed}명 · 대기 ${members.length - confirmed}명`
+      : '참가자가 없습니다. 첫 번째 참가자가 되어 보세요.';
+  }
+
+  // 처리 중 버튼을 잠가 중복 요청과 뒤늦은 응답으로 인한 명단 덮어쓰기를 막습니다.
+  async function run(action) {
+    if (busy) return;
+    busy = true;
+    document.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    document.querySelector('main').setAttribute('aria-busy', 'true');
+    try {
+      await action();
+    } finally {
+      busy = false;
+      document.querySelectorAll('button').forEach(button => { button.disabled = false; });
+      document.querySelector('main').setAttribute('aria-busy', 'false');
+    }
+  }
+
+  function bindForm(formId, url, key) {
+    const form = document.getElementById(formId);
+    form.addEventListener('submit', event => {
+      event.preventDefault(); // 기본 페이지 이동 대신 fetch로 요청합니다.
+      if (busy) return;
+      const input = form.elements.namedItem(key);
+      const value = input.value.trim();
+      if (!value) {
+        showResult('공백이 아닌 값을 입력해 주세요.', true);
+        input.focus();
+        return;
+      }
+      // 요청 전에 입력값을 보관하므로 처리 중 입력을 바꿔도 전송 값은 일정합니다.
+      run(async () => {
+        showResult('요청을 처리하고 있습니다.');
+        try {
+          const body = new URLSearchParams();
+          body.set(key, value);
+          const message = await request(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+            body: body.toString()
+          });
+          showResult(message);
+        } catch (error) {
+          showResult(`${error.message}\n서버 실행과 연결을 확인하세요. 처리 여부는 명단을 확인한 후 판단해 주세요.`, true);
+        }
+        // HTTP 200에도 업무상 거절 문구가 올 수 있어 서버의 결과를 그대로 표시합니다.
+        await refreshList();
+      });
+    });
+  }
+
+  async function refreshList() {
+    try {
+      await loadParticipants();
+    } catch (error) {
+      rows.replaceChildren();
+      summary.textContent = `명단 조회 실패: ${error.message} 서버 연결을 확인한 후 새로고침해 주세요.`;
+    }
+  }
+
+  bindForm('join-form', '/study/participants', 'name');
+  bindForm('cancel-form', '/study/cancel', 'memberId');
+  bindForm('capacity-form', '/study/capacity', 'capacity');
+  document.querySelector('#refresh').addEventListener('click', () => run(refreshList));
+  run(refreshList); // 첫 접속 시 자동 조회
+</script>
+</body>
+</html>
