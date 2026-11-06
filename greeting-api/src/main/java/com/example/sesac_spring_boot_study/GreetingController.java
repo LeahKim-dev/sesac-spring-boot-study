@@ -16,4 +16,8 @@ public class GreetingController {
             @RequestParam(name = "name", defaultValue = "방문자") String name) {
         return service.greet(name);
     }
+    // 브라우저: GET /greet?name=민지
+    // @GetMapping: /greet 요청을 처리할 메서드 선택
+    // @RequestParam: name 매개변수에 "민지"전달
+    // greet("민지") 실행: service.greet(name) 호출
 }
