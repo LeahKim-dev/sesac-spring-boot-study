@@ -1,9 +1,6 @@
 package com.example.sesac_spring_boot_study;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController // 이 클래스는 http요청을 받아서 응답하는 controller
 public class StudyController {
@@ -41,5 +38,11 @@ public class StudyController {
     // Spring Boot: 요청 주소에 맞는 Controller 메서드 호출
     // StudyController: service.getParticipants() 호출
     // StudyService: 참가자 조회 후 결과 반환
+
+    // 참가 취소
+    @PostMapping("/study/cancel")
+    public String cancel(@RequestParam(name = "memberId", required = false) String memberId) {
+        return service.cancel(memberId);
+    }
 
 }

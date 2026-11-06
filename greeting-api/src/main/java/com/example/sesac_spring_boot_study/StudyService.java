@@ -13,15 +13,14 @@ public class StudyService {
     private long nextId = 1;
 
     public String studies(String name) {
-        // 0. 공백 제거
+        // 0. 이름 누락·빈 문자열·공백만 입력한 경우 거절
         if (name ==null) { return "이름을 입력해주세요.";}
 
         name = name.strip();
 
-        //공백을 제거한 결과가 빈문자열이면
         if (name.isEmpty()) {return "이름을 입력해주세요.";}
 
-        // 1. 중복 거절
+        // 1. 기존 참가자와 이름이 중복되면 신청 거절
         for (StudyMember member: members) {
             if (member.getName().equals(name)) {
                 return "이미 신청한 이름입니다.";
@@ -68,5 +67,53 @@ public class StudyService {
             stringBuilder.append("\n");
         }
         return stringBuilder.toString();
+    }
+
+    public String cancel(String memberId) {
+        //0. ID 누락·빈 값·숫자가 아닌 입력 처리
+        if (memberId == null) {return "취소할 참가자의 ID를 입력해주세요.";}
+        memberId = memberId.strip();
+        if (memberId.isEmpty()) {return "취소할 참가자의 ID를 입력해주세요.";}
+
+        long id;
+        try {
+            id = Long.parseLong(memberId);
+        } catch (NumberFormatException e) {
+            return "참가자 ID는 숫자로 입력해주세요.";
+        }
+
+        StudyMember target = null;
+        // 1. 취소할 참가자 찾기
+        for (StudyMember member: members) {
+            if (member.getId() == id) {
+                target = member;
+                break;
+            }
+        }
+
+        // 2. 참가자가 존재하지 않는 경우
+        if (target == null) {
+            return "존재하지 않는 참가자입니다.";
+        }
+
+        // 3. 참가자가 존재한다면 상태 확인
+        if (target.getStatus() == StudyMember.Status.CONFIRMED) {
+            // 확정자일 때: 취소하고 다음 대기자 확정
+            members.remove(target);
+
+            for (StudyMember member : members) {
+                if (member.getStatus() == StudyMember.Status.WAITING) {
+                    member.setStatus(StudyMember.Status.CONFIRMED);
+                    return "취소 완료: " + target.getName()
+                            +" / 확정 완료: " + member.getName();
+                }
+            }
+        } else {
+            // 대기자일 때: 취소
+            members.remove(target);
+            return "취소 완료: " + target.getName();
+        }
+        // 확정자 취소 + 대기자 없음
+        return "취소 완료: " + target.getName();
     }
 }
