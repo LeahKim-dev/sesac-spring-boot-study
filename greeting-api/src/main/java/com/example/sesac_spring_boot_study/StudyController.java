@@ -45,4 +45,9 @@ public class StudyController {
         return service.cancel(memberId);
     }
 
+    // 정원 변경
+    @PostMapping("/study/capacity")
+    public String changeCapacity(@RequestParam(name = "capacity", required = false) String capacity) {
+        return service.changeCapacity(capacity);
+    }
 }

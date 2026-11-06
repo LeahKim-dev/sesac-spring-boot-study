@@ -9,6 +9,8 @@ import java.util.List;
 public class StudyService {
     private final List<StudyMember> members = new ArrayList<>();
     // Spring Bean은 기본적으로 싱글톤 범위로 관리되기 때문에 같은 StudyService 객체를 여러 요청에서 재사용함
+    
+    private int capacity = 3;
 
     private long nextId = 1;
 
@@ -38,7 +40,7 @@ public class StudyService {
 
         // 3. 새로운 참가자 상태 결정
         StudyMember.Status status;
-        if (confirmedCount < 3) {
+        if (confirmedCount < capacity) {
             status = StudyMember.Status.CONFIRMED;
         } else {
             status = StudyMember.Status.WAITING;
@@ -115,5 +117,62 @@ public class StudyService {
         }
         // 확정자 취소 + 대기자 없음
         return "취소 완료: " + target.getName();
+    }
+
+    public String changeCapacity(String capacityInput) {
+       // 정원 입력값 검증
+       if (capacityInput == null) {return "정원 변경 실패: 변경할 정원을 입력해주세요. / 현재 정원 " + capacity + "명";}
+
+        capacityInput = capacityInput.strip();
+
+        if (capacityInput.isEmpty()) {return "정원 변경 실패: 변경할 정원을 입력해주세요. / 현재 정원 " + capacity + "명";}
+
+        int newCapacity;
+
+        try {
+            newCapacity = Integer.parseInt(capacityInput);
+
+        } catch (NumberFormatException e) {
+            return "정원 변경 실패: 정원은 정수로 입력해주세요. / 현재 정원 " + capacity + "명";
+        }
+        if (newCapacity <1 || newCapacity >10) {
+                return "정원 변경 실패: 정원은 1명 이상 10명 이하로 입력해주세요. / 현재 정원 " + capacity + "명";
+        }
+
+        // 동일한 정원 변경 요청 시 명단 유지
+        if (newCapacity == capacity) {
+            return "현재 정원과 동일합니다: / 현재 정원 " + capacity + "명";
+        }
+
+        // 현재 확정 인원 확인
+        int confirmedCount = 0;
+
+        for (StudyMember member : members) {
+            if (member.getStatus() == StudyMember.Status.CONFIRMED) {
+                confirmedCount++;
+            }
+        }
+
+        // 변경 실패
+        if (newCapacity < confirmedCount) {
+            return "정원 변경 실패: 현재 확정 인원보다 정원을 작게 변경할 수 없습니다. / 현재 정원 " + capacity + "명";
+        }
+
+        // 정원 변경 및 대기자 승격
+        capacity = newCapacity;
+
+        int availableSlots = newCapacity - confirmedCount;
+
+        int promotedCount = 0;
+
+        for (StudyMember member : members) {
+            if (availableSlots == 0) {break;}
+            if (member.getStatus() == StudyMember.Status.WAITING) {
+                member.setStatus(StudyMember.Status.CONFIRMED);
+                promotedCount++;
+                availableSlots--;
+            }
+        } return "정원 변경 완료: 현재 정원 " + capacity + "명 "
+                + "/ 이번에 확정된 대기자 " + promotedCount + "명 확정";
     }
 }
