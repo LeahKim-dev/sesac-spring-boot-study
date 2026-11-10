@@ -20,14 +20,17 @@ public class ItemService {
         this.validationService = validationService;
     }
 
-    public List<Item> findAll() {
+    public List<ItemDto> findAll() {
         List<Item> items = itemRepository.findAll();
-        return items;
+        List<ItemDto> itemDtos = items.stream()
+                                .map(item -> ItemDto.from(item))
+                                .toList();
+        return itemDtos;
     }
 
-    public Item findById(Long id) {
+    public ItemDto findById(Long id) {
         Item item = itemRepository.findById(id);
-        return item;
+        return ItemDto.from(item);
     }
 
 
