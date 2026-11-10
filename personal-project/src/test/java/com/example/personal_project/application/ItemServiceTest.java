@@ -122,4 +122,41 @@ public class ItemServiceTest {
 
         assertEquals(before, after);
     }
+
+    @Test
+    @DisplayName("검색어의 앞뒤 공백을 제거하고 이름 부분 검색을 한다")
+    void 이름_부분_검색() {
+        ItemDto savedItem = itemService.add(
+                new ItemDto(null, "캠핑 랜턴", 20000)
+        );
+
+        List<ItemDto> result = itemService.findByNameContaining("  랜턴  ");
+
+        assertTrue(result.contains(savedItem));
+    }
+
+    @Test
+    @DisplayName("빈 검색어로 검색하면 예외가 발생한다")
+    void 빈_검색어_검색시_예외_발생() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            itemService.findByNameContaining("");
+        });
+    }
+
+    @Test
+    @DisplayName("공백만 있는 검색어로 검색하면 예외가 발생한다")
+    void 공백_검색어_검색시_예외_발생() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            itemService.findByNameContaining("   ");
+        });
+    }
+
+    @Test
+    @DisplayName("이름이 일치하는 아이템이 없으면 빈 목록을 반환한다")
+    void 검색_결과가_없으면_빈_목록_반환() {
+        List<ItemDto> result =
+                itemService.findByNameContaining("존재하지않는검색어");
+
+        assertEquals(List.of(), result);
+    }
 }

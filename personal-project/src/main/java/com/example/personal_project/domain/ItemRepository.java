@@ -6,4 +6,5 @@ public interface ItemRepository {
     Item add(Item item);
     List<Item> findAll();
     Item findById(Long id);
+    List<Item> findByNameContaining(String name);
 }

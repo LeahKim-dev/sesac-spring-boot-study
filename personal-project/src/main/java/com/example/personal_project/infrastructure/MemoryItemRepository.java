@@ -39,4 +39,11 @@ public class MemoryItemRepository implements ItemRepository {
                 .findFirst()
                 .orElseThrow(() -> new EntityNotFoundException("item을 찾지 못했습니다."));
     }
+
+    @Override
+    public List<Item> findByNameContaining(String name) {
+        return items.stream()
+                .filter(item -> item.getName().contains(name))
+                .toList();
+    }
 }

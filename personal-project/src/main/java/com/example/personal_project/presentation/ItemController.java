@@ -38,4 +38,12 @@ public class ItemController {
     public List<ItemDto> recommend(@RequestParam int budget) {
         return itemService.recommend(budget);
     }
+
+    // 포함 문자열 검색
+    @GetMapping(value = "/items/search")
+    public List<ItemDto> findItem(
+            @RequestParam(required = false) String name) {
+        return itemService.findByNameContaining(name);
+    }
+
 }
