@@ -32,4 +32,10 @@ public class ItemController {
     public List<ItemDto> findAll() {
         return itemService.findAll();
     }
+
+    // 추천
+    @GetMapping(value = "/items/recommend")
+    public List<ItemDto> recommend(@RequestParam int budget) {
+        return itemService.recommend(budget);
+    }
 }
