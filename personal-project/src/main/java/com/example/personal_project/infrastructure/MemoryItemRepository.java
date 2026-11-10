@@ -27,17 +27,17 @@ public class MemoryItemRepository implements ItemRepository {
     }
 
     @Override
-    public List<Item> findAll() {
-        List<Item> itemList = new ArrayList<>(items);
-        return itemList;
-    }
-
-    @Override
     public Item findById(Long id) {
         return items.stream()
                 .filter(item -> item.getId().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new EntityNotFoundException("item을 찾지 못했습니다."));
+    }
+
+    @Override
+    public List<Item> findAll() {
+        List<Item> itemList = new ArrayList<>(items);
+        return itemList;
     }
 
     @Override

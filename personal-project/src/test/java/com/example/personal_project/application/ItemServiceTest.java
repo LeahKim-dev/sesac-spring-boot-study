@@ -14,7 +14,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest // 테스트를 실행할 때 Spring 애플리케이션의 설정을 읽고, 필요한 빈들을 생성하고 연결
 public class ItemServiceTest {
     @Autowired
     ItemService itemService;
@@ -22,12 +22,14 @@ public class ItemServiceTest {
     @Test
     @DisplayName("아이템 등록 시 이름 공백을 제거하고 실제 id로 조회한다")
     void 정상_등록_id_조회() {
+        // 준비 — 등록할 데이터를 만든다
         ItemDto itemDto = new ItemDto(null, "    노트  ", 12000);
+        // 실행 — 등록하고, 받은 id로 조회한다
         ItemDto savedItemDto = itemService.add(itemDto);
         Long savedItemId = savedItemDto.id();
 
         ItemDto foundItemDto = itemService.findById(savedItemId);
-
+        // 검증 — 기대한 결과인지 확인한다
         assertNotNull(savedItemId);
         assertEquals("노트", savedItemDto.name());
         assertEquals(savedItemDto, foundItemDto);
@@ -47,7 +49,8 @@ public class ItemServiceTest {
     @DisplayName("이름이 null이면 등록을 거부한다")
     void null_이름_등록시_예외_발생() {
         ItemDto itemDto = new ItemDto(null, null, 1000);
-
+        // assertThrows(예상하는_예외, 실행할_코드);
+        // () -> {}
         assertThrows(IllegalArgumentException.class, () -> {
             itemService.add(itemDto);
         });

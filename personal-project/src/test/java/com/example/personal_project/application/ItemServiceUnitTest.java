@@ -34,6 +34,8 @@ public class ItemServiceUnitTest {
         when(validationService.validatePrice(12000)).thenReturn(12000);
 
         Item savedItem = new Item(1L, "노트", 12000);
+        // any(Item.class): 어떤 Item 객체가 인자로 들어와도
+        // Repository의 add에 어떤 Item 객체가 들어오든, 준비해 둔 savedItem을 반환
         when(itemRepository.add(any(Item.class))).thenReturn(savedItem);
 
         ItemDto result = itemService.add(new ItemDto(null, "노트", 12000));
@@ -51,18 +53,20 @@ public class ItemServiceUnitTest {
         assertThrows(IllegalArgumentException.class,
                 () -> itemService.add(itemDto));
 
-        verifyNoInteractions(itemRepository);
+        verifyNoInteractions(itemRepository);// 저장소에 아무 요청도 하지 않았나?
     }
 
     @Test
     @DisplayName("예산이 0원이면 무료 아이템만 추천한다")
     void 예산_0원시_무료_아이템_추천() {
+        // 가짜 검증 객체가 예산 0을 받으면, 검증을 통과한 값 0을 반환
         when(validationService.validateBudget(0)).thenReturn(0);
 
         List<Item> items = List.of(
                 new Item(1L, "노트", 12000),
                 new Item(2L, "무료 샘플", 0)
         );
+        // Service가 가짜 Repository에 전체 목록을 요청하면, 두 아이템의 목록을 반환
         when(itemRepository.findAll()).thenReturn(items);
 
         List<ItemDto> result = itemService.recommend(0);
@@ -70,6 +74,7 @@ public class ItemServiceUnitTest {
         List<ItemDto> expected = List.of(
                 new ItemDto(2L, "무료 샘플", 0)
         );
+        // 실제 추천 결과가 무료 샘플 하나뿐인 목록과 같은가?
         assertEquals(expected, result);
     }
 

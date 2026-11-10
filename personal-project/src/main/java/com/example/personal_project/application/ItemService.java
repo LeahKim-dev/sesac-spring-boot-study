@@ -21,20 +21,6 @@ public class ItemService {
         this.validationService = validationService;
     }
 
-    public List<ItemDto> findAll() {
-        List<Item> items = itemRepository.findAll();
-        List<ItemDto> itemDtos = items.stream()
-                                .map(item -> ItemDto.from(item))
-                                .toList();
-        return itemDtos;
-    }
-
-    public ItemDto findById(Long id) {
-        Item item = itemRepository.findById(id);
-        return ItemDto.from(item);
-    }
-
-
     public ItemDto add(ItemDto itemDto) {
         String name = validationService.validateName(itemDto.name());
         int price = validationService.validatePrice(itemDto.price());
@@ -42,6 +28,19 @@ public class ItemService {
         Item item = new Item(null, name, price);
         Item savedItem = itemRepository.add(item);
         return ItemDto.from(savedItem);
+    }
+
+    public ItemDto findById(Long id) {
+        Item item = itemRepository.findById(id);
+        return ItemDto.from(item);
+    }
+
+    public List<ItemDto> findAll() {
+        List<Item> items = itemRepository.findAll();
+        List<ItemDto> itemDtos = items.stream()
+                                .map(item -> ItemDto.from(item))
+                                .toList();
+        return itemDtos;
     }
 
     public List<ItemDto> recommend(int budget) {
