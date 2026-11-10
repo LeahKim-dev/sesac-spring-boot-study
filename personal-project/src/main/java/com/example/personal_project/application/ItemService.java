@@ -1,0 +1,42 @@
+package com.example.personal_project.application;
+
+import com.example.personal_project.domain.Item;
+import com.example.personal_project.domain.ItemRepository;
+import com.example.personal_project.presentation.ItemDto;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class ItemService {
+    private final ItemRepository itemRepository;
+    private final ValidationService validationService;
+
+    @Autowired
+    public ItemService(ItemRepository itemRepository,
+                       ValidationService validationService) {
+        this.itemRepository = itemRepository;
+        this.validationService = validationService;
+    }
+
+    public List<Item> findAll() {
+        List<Item> items = itemRepository.findAll();
+        return items;
+    }
+
+    public Item findById(Long id) {
+        Item item = itemRepository.findById(id);
+        return item;
+    }
+
+
+    public ItemDto add(ItemDto itemDto) {
+        String name = validationService.validateName(itemDto.name());
+        int price = validationService.validatePrice(itemDto.price());
+
+        Item item = new Item(null, name, price);
+        Item savedItem = itemRepository.add(item);
+        return ItemDto.from(savedItem);
+    }
+}
