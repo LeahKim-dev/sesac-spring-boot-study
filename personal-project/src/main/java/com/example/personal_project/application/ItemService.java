@@ -54,4 +54,13 @@ public class ItemService {
                 .map(item -> ItemDto.from(item))
                 .toList();
     }
+
+    public List<ItemDto> findByNameContaining(String name) {
+        String validName = validationService.validateName(name);
+        List<Item> items = itemRepository.findByNameContaining(validName);
+        List<ItemDto> itemDtos = items.stream()
+                                .map(item -> ItemDto.from(item))
+                                .toList();
+        return itemDtos;
+    }
 }
