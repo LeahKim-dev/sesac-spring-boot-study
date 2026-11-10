@@ -6,6 +6,7 @@ import com.example.personal_project.presentation.ItemDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -41,5 +42,16 @@ public class ItemService {
         Item item = new Item(null, name, price);
         Item savedItem = itemRepository.add(item);
         return ItemDto.from(savedItem);
+    }
+
+    public List<ItemDto> recommend(int budget) {
+        int validBudget = validationService.validateBudget(budget);
+        List<Item> items = itemRepository.findAll();
+        return items.stream()
+                .filter(item -> item.getPrice() <= validBudget)
+                .sorted(Comparator.comparing(item -> item.getPrice()))
+                .limit(3)
+                .map(item -> ItemDto.from(item))
+                .toList();
     }
 }
