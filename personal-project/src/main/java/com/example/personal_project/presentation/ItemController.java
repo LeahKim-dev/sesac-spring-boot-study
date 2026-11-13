@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/items")
 public class ItemController {
     private final ItemService itemService;
 
@@ -15,35 +16,41 @@ public class ItemController {
     }
 
     // 상품 등록
-    @PostMapping(value = "/items")
+    @PostMapping
     public ItemDto add(
             @RequestBody ItemDto itemDto) {
         return itemService.add(itemDto);
     }
 
     // 상품 id로 조회
-    @GetMapping(value = "/items/{id}")
+    @GetMapping("/{id}")
     public ItemDto findById(@PathVariable Long id){
         return itemService.findById(id);
     }
 
     // 상품 전체 조회
-    @GetMapping(value = "/items")
+    @GetMapping
     public List<ItemDto> findAll() {
         return itemService.findAll();
     }
 
     // 추천
-    @GetMapping(value = "/items/recommend")
+    @GetMapping("/recommend")
     public List<ItemDto> recommend(@RequestParam int budget) {
         return itemService.recommend(budget);
     }
 
     // 포함 문자열 검색
-    @GetMapping(value = "/items/search")
+    @GetMapping("/search")
     public List<ItemDto> findItem(
             @RequestParam(required = false) String name) {
         return itemService.findByNameContaining(name);
+    }
+
+    @PostMapping("/import/{externalId}")
+    public ItemDto importExternal(
+            @PathVariable("externalId") long externalId) {
+        return itemService.importExternal(externalId);
     }
 
 }

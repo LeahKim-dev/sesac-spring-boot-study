@@ -57,7 +57,8 @@ public class DummyJsonClient {
             // 외부 JSON 응답을 상품 DTO로 받음
             DummyJsonProduct product = restClient.get()
                     .uri("/products/{id}", id)
-                    .retrieve()
+                    .retrieve() // 응답 처리 방법을 선택하는 단계
+                    //응답 본문을 DummyJsonProduct 타입의 객체로 만들어서 돌려줘
                     .body(DummyJsonProduct.class);
 
             // 성공 응답이어도 본문이 없으면 502

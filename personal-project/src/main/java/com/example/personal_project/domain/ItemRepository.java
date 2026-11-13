@@ -7,4 +7,5 @@ public interface ItemRepository {
     List<Item> findAll();
     Item findById(Long id);
     List<Item> findByNameContaining(String name);
+    boolean existsExternal(SourceType sourceType, Long externalId);
 }
