@@ -2,6 +2,9 @@ package com.example.personal_project.application;
 
 import com.example.personal_project.domain.Item;
 import com.example.personal_project.domain.ItemRepository;
+import com.example.personal_project.domain.SourceType;
+import com.example.personal_project.infrastructure.DummyJsonClient;
+import com.example.personal_project.infrastructure.DummyJsonProduct;
 import com.example.personal_project.presentation.ItemDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,14 +12,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class ItemServiceUnitTest {
@@ -24,6 +30,8 @@ public class ItemServiceUnitTest {
     private ItemRepository itemRepository;
     @Mock
     private ValidationService validationService;
+    @Mock
+    private DummyJsonClient client;
     @InjectMocks
     private ItemService itemService;
 
@@ -116,5 +124,123 @@ public class ItemServiceUnitTest {
         List<ItemDto> result = itemService.recommend(1000);
 
         assertEquals(List.of(), result);
+    }
+
+    @Test
+    @DisplayName("외부 상품을 원화로 환산하여 가져온다")
+    void 외부_상품_가져오기_성공() {
+        DummyJsonProduct product = new DummyJsonProduct(
+                1L,
+                "마스카라",
+                new BigDecimal("9.99"),
+                "beauty",
+                "https://example.com/product.webp",
+                99);
+
+        when(client.findById(1L)).thenReturn(product);
+
+        Item savedItem = new Item(10L,
+                "마스카라",
+                9990,
+                SourceType.DUMMY_JSON,
+                1L,
+                99);
+
+        when(itemRepository.add(any(Item.class))).thenReturn(savedItem);
+
+        ItemDto result = itemService.importExternal(1L);
+
+        // 저장 결과를 DTO로 반환했는지 확인
+        assertEquals(ItemDto.from(savedItem), result);
+
+        // Service가 저장 요청한 Item의 가격 확인
+        verify(itemRepository).add(
+                argThat(item -> item.getPrice() == 9990
+                        && item.getSourceType() == SourceType.DUMMY_JSON
+                        && Objects.equals(item.getExternalId(), 1L)
+                        && Objects.equals(item.getStock(), 99)
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("이미 가져온 외부 상품은 중복 등록하지 않는다")
+    void 이미_가져온_외부_상품은_등록_거부() {
+        when(itemRepository.existsExternal(SourceType.DUMMY_JSON, 1L)).thenReturn(true);
+
+        // 중복 상품 가져오기를 실행하면 ResponseStatusException이 발생해야 한다
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> itemService.importExternal(1L)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+
+        // 중복을 발견한 뒤 외부 상품 조회를 요청하지 않았는지 확인
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    @DisplayName("품절 상품도 위시리스트에 가져올 수 있다")
+    void 품절_외부_상품도_가져오기_허용() {
+        DummyJsonProduct product = new DummyJsonProduct(
+                1L,
+                "마스카라",
+                new BigDecimal("9.99"),
+                "beauty",
+                "https://example.com/product.webp",
+                0);
+
+        when(client.findById(1L)).thenReturn(product);
+
+        Item savedItem = new Item(10L,
+                "마스카라",
+                9990,
+                SourceType.DUMMY_JSON,
+                1L,
+                0);
+
+        when(itemRepository.add(any(Item.class))).thenReturn(savedItem);
+
+        ItemDto result = itemService.importExternal(1L);
+
+        assertEquals(ItemDto.from(savedItem), result);
+
+        verify(itemRepository).add(
+                argThat(item -> item.getStock() == 0)
+        );
+    }
+
+    @Test
+    @DisplayName("외부 가격 환산 후 HALF_UP으로 반올림한다")
+    void 	외부_가격을_원_단위로_반올림() {
+        DummyJsonProduct product = new DummyJsonProduct(
+                1L,
+                "마스카라",
+                new BigDecimal("9.9905"),
+                "beauty",
+                "https://example.com/product.webp",
+                99);
+
+        when(client.findById(1L)).thenReturn(product);
+
+        Item savedItem = new Item(10L,
+                "마스카라",
+                9991,
+                SourceType.DUMMY_JSON,
+                1L,
+                99);
+
+        when(itemRepository.add(any(Item.class))).thenReturn(savedItem);
+
+        ItemDto result = itemService.importExternal(1L);
+
+        // 저장 결과를 DTO로 반환했는지 확인
+        assertEquals(ItemDto.from(savedItem), result);
+
+        // Service가 저장 요청한 Item의 가격 확인
+        verify(itemRepository).add(
+                argThat(item -> item.getPrice() == 9991)
+        );
     }
 }
