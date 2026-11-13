@@ -62,4 +62,15 @@ public class MemoryItemRepository implements ItemRepository {
                 // 남은 아이템이 하나라도 있으면 true
                 .anyMatch(item -> true);
     }
+
+    @Override
+    public Item update(Item item) {
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).getId().equals(item.getId())) {
+                items.set(i, item);
+                return item;
+            }
+        }
+        throw new EntityNotFoundException("아이템을 찾지 못했습니다.");
+    }
 }

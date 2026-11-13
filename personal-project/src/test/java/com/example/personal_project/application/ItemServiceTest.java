@@ -1,5 +1,9 @@
 package com.example.personal_project.application;
 
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import com.example.personal_project.domain.SourceType;
+import com.example.personal_project.domain.Item;
 import com.example.personal_project.domain.EntityNotFoundException;
 import com.example.personal_project.domain.ItemRepository;
 import com.example.personal_project.infrastructure.MemoryItemRepository;
@@ -18,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.*;
 public class ItemServiceTest {
     @Autowired
     ItemService itemService;
+
+    @Autowired
+    ItemRepository itemRepository;
 
     @Test
     @DisplayName("아이템 등록 시 이름 공백을 제거하고 실제 id로 조회한다")
@@ -161,5 +168,177 @@ public class ItemServiceTest {
                 itemService.findByNameContaining("존재하지않는검색어");
 
         assertEquals(List.of(), result);
+    }
+
+    @Test
+    @DisplayName("수동 상품의 이름과 가격을 수정한다")
+    void 수동_상품의_이름과_가격_수정() {
+        ItemDto createDto = new ItemDto(null, "연필", 1000);
+        ItemDto savedDto = itemService.add(createDto);
+
+        ItemDto updateDto = new ItemDto(null, " 볼펜 ", 2000);
+        ItemDto updatedDto = itemService.update(savedDto.id(), updateDto);
+
+        ItemDto foundDto = itemService.findById(savedDto.id());
+
+        assertEquals(savedDto.id(), foundDto.id()); // 수정해도 원래 상품의 id가 유지됐는지 확인
+        assertEquals("볼펜", foundDto.name());
+        assertEquals(Integer.valueOf(2000), foundDto.price());
+        assertEquals(updatedDto, foundDto); // 수정했다고 반환한 내용이 실제 저장된 내용과 같은지 확인
+    }
+
+    @Test
+    @DisplayName("외부 상품 수정은 409로 거부하고 저장된 정보를 유지한다")
+    void 외부_상품_수정_거부시_원본_유지() {
+        // 외부 서버를 호출하지 않고 실제 메모리 저장소에 외부 상품을 준비
+        Item savedItem = itemRepository.add(new Item(
+                null, "마스카라", 9990, SourceType.DUMMY_JSON, 1L, 99));
+
+        // 수정 시도 전 목록
+        List<ItemDto> before = itemService.findAll();
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+            itemService.update(savedItem.getId(), new ItemDto(null, "수정 시도", 100));
+        });
+
+        // 예외 상태가 409인지 확인
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        // 실패 후 저장 내용이 그대로인지
+        assertEquals(before, itemService.findAll());
+
+        // DTO에 없는 출처·외부 id·재고도 실제 저장소에서 확인
+        Item foundItem = itemRepository.findById(savedItem.getId());
+        assertEquals("마스카라", foundItem.getName());
+        assertEquals(9990, foundItem.getPrice());
+        assertEquals(SourceType.DUMMY_JSON, foundItem.getSourceType());
+        assertEquals(Long.valueOf(1L), foundItem.getExternalId());
+        assertEquals(Integer.valueOf(99), foundItem.getStock());
+    }
+
+    @Test
+    @DisplayName("null 이름으로 수정하면 거부하고 기존 목록을 유지한다")
+    void null_이름_수정시_기존_목록_유지() {
+        ItemDto savedDto = itemService.add(new ItemDto(null, "연필", 1000));
+
+        List<ItemDto> before = itemService.findAll();
+
+        // IllegalArgumentException이 발생하는지 확인
+        assertThrows(IllegalArgumentException.class, () -> {
+            itemService.update(savedDto.id(), new ItemDto(null, null, 2000));
+        });
+
+        assertEquals(before, itemService.findAll());
+    }
+
+    @Test
+    @DisplayName("빈 이름으로 수정하면 거부하고 기존 목록을 유지한다")
+    void 빈_이름_수정시_기존_목록_유지() {
+        ItemDto savedDto = itemService.add(new ItemDto(null, "연필", 1000));
+
+        List<ItemDto> before = itemService.findAll();
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            itemService.update(savedDto.id(), new ItemDto(null, "", 2000));
+        });
+
+        assertEquals(before, itemService.findAll());
+    }
+
+    @Test
+    @DisplayName("공백 이름으로 수정하면 거부하고 기존 목록을 유지한다")
+    void 공백_이름_수정시_기존_목록_유지() {
+        ItemDto savedDto = itemService.add(new ItemDto(null, "연필", 1000));
+        List<ItemDto> before = itemService.findAll();
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            itemService.update(savedDto.id(), new ItemDto(null, "   ", 2000));
+        });
+
+        assertEquals(before, itemService.findAll());
+    }
+
+    @Test
+    @DisplayName("음수 가격으로 수정하면 이름도 바뀌지 않고 기존 목록을 유지한다")
+    void 음수_가격_수정시_기존_목록_유지() {
+        ItemDto savedDto = itemService.add(new ItemDto(null, "연필", 1000));
+        List<ItemDto> before = itemService.findAll();
+
+        // 이름도 바뀌면 안 된다
+        assertThrows(IllegalArgumentException.class, () -> {
+            itemService.update(savedDto.id(), new ItemDto(null, "바뀌면 안 되는 이름", -1));
+        });
+
+        assertEquals(before, itemService.findAll());
+    }
+
+    @Test
+    @DisplayName("가격이 누락된 수정은 거부하고 기존 목록을 유지한다")
+    void 가격_누락_수정시_기존_목록_유지() {
+        ItemDto savedDto = itemService.add(new ItemDto(null, "연필", 1000));
+        List<ItemDto> before = itemService.findAll();
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            itemService.update(savedDto.id(), new ItemDto(null, "볼펜", null));
+        });
+
+        assertEquals(before, itemService.findAll());
+    }
+
+    @Test
+    @DisplayName("없는 id로 수정하면 찾을 수 없음 예외가 발생하고 목록을 유지한다")
+    void 없는_id_수정시_기존_목록_유지() {
+        itemService.add(new ItemDto(null, "연필", 1000));
+        List<ItemDto> before = itemService.findAll();
+
+        assertThrows(EntityNotFoundException.class, () -> {
+            itemService.update(-1L, new ItemDto(null, "볼펜", 2000));
+        });
+
+        assertEquals(before, itemService.findAll());
+    }
+
+    @Test
+    @DisplayName("수동 상품을 0원으로 수정할 수 있고 수동 출처를 유지한다")
+    void 수동_상품_0원_수정_허용() {
+        ItemDto savedDto = itemService.add(new ItemDto(null, "연필", 1000));
+
+        ItemDto updatedDto = itemService.update(
+                savedDto.id(), new ItemDto(null, "무료 샘플", 0));
+
+        ItemDto foundDto = itemService.findById(savedDto.id());
+
+        assertEquals(savedDto.id(), foundDto.id());
+        assertEquals("무료 샘플", foundDto.name());
+        assertEquals(Integer.valueOf(0), foundDto.price());
+        assertEquals(updatedDto, foundDto); // 실제로 저장됐는지 확인
+
+        Item foundItem = itemRepository.findById(savedDto.id());
+
+        assertEquals(SourceType.MANUAL, foundItem.getSourceType());
+        assertNull(foundItem.getExternalId());
+        assertNull(foundItem.getStock());
+    }
+
+    @Test
+    @DisplayName("수정 요청 본문의 id 대신 전달받은 대상 id로 수정한다")
+    void 수정_요청_본문의_id는_사용하지_않음() {
+        ItemDto targetDto = itemService.add(new ItemDto(null, "연필", 1000));
+        ItemDto otherDto = itemService.add(new ItemDto(null, "노트", 12000));
+
+        List<ItemDto> before = itemService.findAll();
+
+        ItemDto updatedDto = itemService.update(
+                targetDto.id(), new ItemDto(otherDto.id(), "볼펜", 2000)); // target이 수정
+
+        assertEquals(targetDto.id(), updatedDto.id());
+        assertEquals(updatedDto, itemService.findById(targetDto.id()));
+        assertEquals(otherDto, itemService.findById(otherDto.id()));
+
+        // 기존 위치와 목록 개수도 그대로 유지
+        List<ItemDto> after = itemService.findAll();
+        assertEquals(before.size(), after.size());
+        for (int i = 0; i < before.size(); i++) {
+            assertEquals(before.get(i).id(), after.get(i).id());
+        }
     }
 }

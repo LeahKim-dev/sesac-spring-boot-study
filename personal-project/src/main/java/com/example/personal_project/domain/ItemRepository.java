@@ -8,4 +8,5 @@ public interface ItemRepository {
     Item findById(Long id);
     List<Item> findByNameContaining(String name);
     boolean existsExternal(SourceType sourceType, Long externalId);
+    Item update(Item item);
 }

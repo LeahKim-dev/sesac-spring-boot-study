@@ -90,8 +90,33 @@ public class ItemService {
 
         int price = convertedPrice.intValueExact();
 
-        Item item = new Item(null, product.title(), price, SourceType.DUMMY_JSON, product.id(), product.stock());
+        Item item = new Item(
+                null,
+                product.title(),
+                price,
+                SourceType.DUMMY_JSON,
+                product.id(),
+                product.stock()
+        );
         Item savedItem = itemRepository.add(item);
+
+        return ItemDto.from(savedItem);
+    }
+
+    public ItemDto update(Long id, ItemDto itemDto) {
+        Item existingItem = itemRepository.findById(id);
+
+        if (existingItem.getSourceType() != SourceType.MANUAL) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, // 409
+                    ("외부 상품의 이름과 가격은 수정할 수 없습니다.")
+            );
+        }
+        String name = validationService.validateName(itemDto.name());
+        int price = validationService.validatePrice(itemDto.price());
+
+        Item updatedItem = new Item(existingItem.getId(), name, price);
+        Item savedItem = itemRepository.update(updatedItem);
 
         return ItemDto.from(savedItem);
     }

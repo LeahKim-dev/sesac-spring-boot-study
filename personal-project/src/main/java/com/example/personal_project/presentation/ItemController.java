@@ -47,10 +47,19 @@ public class ItemController {
         return itemService.findByNameContaining(name);
     }
 
+    // 외부 상품 가져오기
     @PostMapping("/import/{externalId}")
     public ItemDto importExternal(
             @PathVariable("externalId") long externalId) {
         return itemService.importExternal(externalId);
+    }
+
+    // 수동 이름 가격 수정
+    @PutMapping("/{id}")
+    public ItemDto update(
+            @PathVariable("id") Long id,
+            @RequestBody ItemDto itemDto) {
+        return itemService.update(id, itemDto);
     }
 
 }

@@ -260,4 +260,23 @@ public class ItemServiceUnitTest {
         // Repository를 사용했어도 괜찮지만, add()는 한 번도 호출하면 안 돼
         verify(itemRepository, never()).add(any(Item.class));
     }
+
+    @Test
+    @DisplayName("외부 상품 수정은 409로 거부하고 저장 요청을 하지 않는다")
+    void 외부_상품_수정_거부() {
+        Item existingItem = new Item(
+                10L, "마스카라", 9990, SourceType.DUMMY_JSON, 1L, 99);
+
+        when(itemRepository.findById(10L)).thenReturn(existingItem);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+            itemService.update(10L, new ItemDto(null, "수정 시도", 100));
+        });
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        // Repository에 수정 저장을 요청하지 않았는지 확인
+        verify(itemRepository, never()).update(any(Item.class));
+        // 이름·가격 검증이나 외부 조회도 호출하지 않았는지 확인
+        verifyNoInteractions(validationService, client);
+    }
 }
