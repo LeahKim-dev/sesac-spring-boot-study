@@ -4,8 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.math.BigDecimal;
 
-@JsonIgnoreProperties(ignoreUnknown = true) // DTO에 없는 JSON 필드를 무시
-public record DummyJsonProduct( // 외부 사이트에서 받은 상품 정보를 담는 그릇
+// 상품 한 개의 외부 응답 DTO. 선언하지 않은 JSON 항목은 무시
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record DummyJsonProduct(
         Long id,
         String title,
         BigDecimal price,
