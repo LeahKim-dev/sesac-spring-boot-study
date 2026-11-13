@@ -213,7 +213,7 @@ public class ItemServiceUnitTest {
 
     @Test
     @DisplayName("외부 가격 환산 후 HALF_UP으로 반올림한다")
-    void 	외부_가격을_원_단위로_반올림() {
+    void 외부_가격을_원_단위로_반올림() {
         DummyJsonProduct product = new DummyJsonProduct(
                 1L,
                 "마스카라",
@@ -242,5 +242,22 @@ public class ItemServiceUnitTest {
         verify(itemRepository).add(
                 argThat(item -> item.getPrice() == 9991)
         );
+    }
+
+    @Test
+    @DisplayName("외부 상품 조회에 실패하면 저장하지 않는다")
+    void 외부_상품_조회_실패시_저장하지_않음() {
+        // 외부 조회가 실패하는 상황을 준비
+        when(client.findById(1L)).thenThrow(new ResponseStatusException (
+                HttpStatus.BAD_GATEWAY,
+                "외부 상품 정보를 가져오지 못했습니다."));
+
+        // Service를 실행해서 예외가 전달되는지 확인
+        assertThrows(ResponseStatusException.class, () -> {
+            itemService.importExternal(1L);
+        });
+
+        // Repository를 사용했어도 괜찮지만, add()는 한 번도 호출하면 안 돼
+        verify(itemRepository, never()).add(any(Item.class));
     }
 }
