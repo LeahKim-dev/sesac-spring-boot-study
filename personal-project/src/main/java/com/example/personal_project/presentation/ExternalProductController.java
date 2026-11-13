@@ -2,10 +2,8 @@ package com.example.personal_project.presentation;
 
 import com.example.personal_project.infrastructure.DummyJsonClient;
 import com.example.personal_project.infrastructure.DummyJsonProduct;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.example.personal_project.infrastructure.DummyJsonProductList;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/external-products")
@@ -16,9 +14,20 @@ public class ExternalProductController {
         this.client = client;
     }
 
-    // 조회
+    // 상품 조회
     @GetMapping("/{id}")
-    public DummyJsonProduct findById(@PathVariable("id") long id) {
+    public DummyJsonProduct findById(
+            @PathVariable("id") long id) {
         return client.findById(id);
     }
+
+    // 목록 조회
+    @GetMapping
+    public DummyJsonProductList findAll (
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(defaultValue = "0") int skip) {
+        return client.findAll(limit, skip);
+    }
+
+
 }

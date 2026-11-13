@@ -2,6 +2,8 @@ package com.example.personal_project.infrastructure;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+
+import com.sun.net.httpserver.HttpsConfigurator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -68,7 +70,7 @@ public class DummyJsonClient {
             // 외부 서버가 404 응답
             if (exception.getStatusCode().value() == 404) {
                 throw new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
+                        HttpStatus.NOT_FOUND, //404
                         "외부 상품을 찾을 수 없습니다."
                 );
             }
@@ -87,4 +89,40 @@ public class DummyJsonClient {
         }
     }
 
+    public DummyJsonProductList findAll(int limit, int skip) {
+        // 입력 검사
+        if (limit <1 || limit > 20) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, // 400
+                    "limit은 1 이상 20 이하여야 합니다."
+            );
+        }
+
+        if (skip < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "skip은 0 이상이어야 합니다."
+            );
+        }
+        try {
+            // 외부 요청
+            DummyJsonProductList response = restClient.get()// 마지막에 받아올 목록 응답 객체를 response라는 변수에 담겠다
+                    .uri("/products?limit={limit}&skip={skip}", limit, skip)
+                    .retrieve() // 응답을 받아 처리
+                    .body(DummyJsonProductList.class);
+
+            // 응답 반환
+            if (response == null) { // 요청이 끝났는데 받은 값이 null
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY, //502
+                        "외부 상품 목록 응답이 비어 있습니다."
+                );
+            }
+            return response;
+        } catch (RestClientException exception) { // 요청 도중 연결 실패 등의 예외 발생
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "외부 상품 목록을 가져오지 못했습니다.");
+        }
+    }
 }
