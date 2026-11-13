@@ -100,21 +100,8 @@ public class DummyJsonClient {
     // 외부 상품 목록 조회
     public DummyJsonProductList findAll(int limit, int skip) {
 
-        // 조회 개수는 1~20개만 허용
-        if (limit <1 || limit > 20) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "limit은 1 이상 20 이하여야 합니다."
-            );
-        }
+        validatePaging(limit, skip);
 
-        // 건너뛸 개수는 0 이상
-        if (skip < 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "skip은 0 이상이어야 합니다."
-            );
-        }
         try {
 
             DummyJsonProductList response = restClient.get()
@@ -146,7 +133,7 @@ public class DummyJsonClient {
         if (keyword == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "이름을 입력해주세요.");
+                    "검색어를 입력해주세요.");
         }
         // 공백을 제거한 값을 다시 저장
         keyword = keyword.strip();
@@ -155,24 +142,11 @@ public class DummyJsonClient {
         if (keyword.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "이름을 입력해주세요.");
+                    "검색어를 입력해주세요.");
         }
 
-        // 조회 개수는 1~20개만 허용
-        if (limit <1 || limit > 20) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "limit은 1 이상 20 이하여야 합니다."
-            );
-        }
+        validatePaging(limit, skip);
 
-        // 건너뛸 개수는 0 이상
-        if (skip < 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "skip은 0 이상이어야 합니다."
-            );
-        }
         try {
 
             DummyJsonProductList response = restClient.get()
@@ -195,6 +169,24 @@ public class DummyJsonClient {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
                     "외부 상품 목록을 가져오지 못했습니다.");
+        }
+    }
+
+    private void validatePaging(int limit, int skip) {
+        // 조회 개수는 1~20개만 허용
+        if (limit <1 || limit > 20) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "limit은 1 이상 20 이하여야 합니다."
+            );
+        }
+
+        // 건너뛸 개수는 0 이상
+        if (skip < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "skip은 0 이상이어야 합니다."
+            );
         }
     }
 }
