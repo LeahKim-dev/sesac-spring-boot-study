@@ -120,4 +120,8 @@ public class ItemService {
 
         return ItemDto.from(savedItem);
     }
+
+    public void remove(Long id) {
+        itemRepository.remove(id);
+    }
 }

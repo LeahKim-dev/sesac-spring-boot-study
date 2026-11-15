@@ -73,4 +73,10 @@ public class MemoryItemRepository implements ItemRepository {
         }
         throw new EntityNotFoundException("아이템을 찾지 못했습니다.");
     }
+
+    @Override
+    public void remove(Long id) {
+        Item item = findById(id);
+        items.remove(item);
+    }
 }

@@ -2,6 +2,7 @@ package com.example.personal_project.presentation;
 
 import com.example.personal_project.application.ItemService;
 import com.example.personal_project.domain.Item;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -62,4 +63,10 @@ public class ItemController {
         return itemService.update(id, itemDto);
     }
 
+    // 위시리스트 상품 삭제
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void remove(@PathVariable("id") Long id) {
+        itemService.remove(id);
+    }
 }

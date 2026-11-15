@@ -9,4 +9,5 @@ public interface ItemRepository {
     List<Item> findByNameContaining(String name);
     boolean existsExternal(SourceType sourceType, Long externalId);
     Item update(Item item);
+    void remove(Long id);
 }
