@@ -5,6 +5,7 @@ import com.example.personal_project.domain.ItemRepository;
 import com.example.personal_project.domain.EntityNotFoundException;
 import com.example.personal_project.domain.SourceType;
 import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Repository
+@Profile({"default", "test"})
 public class MemoryItemRepository implements ItemRepository {
     private List<Item> items = new CopyOnWriteArrayList<>();
     private AtomicLong sequence = new AtomicLong(1L);
