@@ -2,6 +2,7 @@ package com.example.personal_project.application;
 
 import com.example.personal_project.domain.*;
 import com.example.personal_project.presentation.CartItemResponse;
+import com.example.personal_project.presentation.CartPreviewResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class CartService {
 //        ↓
 //        CartItemResponse
 //        “장바구니 1번 행에 노트 2개를 담았어”
+
         // Service가 ItemRepository에서 기존 Item을 받아.
         Item item = itemRepository.findById(itemId);
 //        Item
@@ -78,5 +80,22 @@ public class CartService {
     public void remove(Long id) {
         Cart cart = cartRepository.getCart();
         cart.remove(id);
+    }
+
+    public CartPreviewResponse preview(String couponCode) {
+        Coupon coupon;
+        // 쿠폰 확인
+        try {
+            coupon = Coupon.valueOf(couponCode);
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            throw new IllegalArgumentException("사용할 수 없는 쿠폰 코드입니다.");
+        }
+        // 저장소에서 Cart 받기
+        Cart cart = cartRepository.getCart();
+        // 금액 계산
+        CartPreview preview = cart.preview(coupon);
+        // 응답DTO 변환
+        CartPreviewResponse response = CartPreviewResponse.from(preview);
+        return response;
     }
 }

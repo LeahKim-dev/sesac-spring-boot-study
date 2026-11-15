@@ -43,4 +43,12 @@ public class CartController {
             @Valid @RequestBody ChangeQuantityRequest request) {
         return cartService.changeQuantity(id, request.quantity());
     }
+
+    // 금액 미리보기 요청
+    @GetMapping("/preview")
+    public CartPreviewResponse preview(
+            @RequestParam(name = "couponCode", defaultValue = "NONE")
+            String couponCode) {
+    return cartService.preview(couponCode);
+    }
 }

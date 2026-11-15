@@ -82,4 +82,47 @@ public class Cart {
         CartItem cartItem = findById(id);
         items.remove(cartItem);
     }
+
+    public CartPreview preview(Coupon coupon) {
+        // 쿠폰값이 없을 때
+        if (coupon == null) {
+            throw new IllegalArgumentException("쿠폰을 선택해주세요.");
+        }
+        // 장바구니가 비어있을 때
+        if (items.isEmpty()) {
+            if (coupon != Coupon.NONE) {
+                throw new IllegalArgumentException(
+                        "빈 장바구니에는 쿠폰을 사용할 수 없습니다."
+                );
+            }
+
+            return new CartPreview(0L, 0L, 0L, 0L, 0L, Coupon.NONE);
+        }
+
+        // 총 합
+        long subtotal = 0L;
+        for (CartItem cartItem : items) {
+            subtotal += cartItem.getUnitPrice() * cartItem.getQuantity();
+        }
+
+        // 쿠폰 할인
+        long discount = coupon.calculateDiscount(subtotal);
+        long discountedSubtotal = subtotal - discount;
+
+        // 배송비
+        long shipping;
+        if (discountedSubtotal >= 100000L) {shipping = 0L;}
+        else {shipping = 5000L;}
+
+        long finalAmount = discountedSubtotal + shipping;
+
+        return new CartPreview(
+                subtotal,
+                discount,
+                discountedSubtotal,
+                shipping,
+                finalAmount,
+                coupon
+        );
+    }
 }
