@@ -8,6 +8,19 @@ public class Cart {
     private final List<CartItem> items = new ArrayList<>();
     private long sequence = 1L;
 
+    public Cart() {
+    }
+
+    // DB에서 읽은 장바구니 복원
+    public Cart(List<CartItem> items, long nextSequence) {
+        this.items.addAll(items);
+        this.sequence = nextSequence;
+    }
+
+    public long getNextSequence() {
+        return sequence;
+    }
+
     public CartItem add(Item item, int quantity) {
         if (quantity <1 || quantity >5) {
             throw new IllegalArgumentException( // 400
