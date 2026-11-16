@@ -1,4 +1,4 @@
-# 취미 위시리스트 · 외부 상품 연동과 장바구니
+# 취미 위시리스트 · 외부 상품 연동과 장바구니 · MySQL 저장
 
 원하는 상품을 직접 등록하거나 DummyJSON에서 가져와 위시리스트에 저장하고, 예산별 추천과 장바구니 금액 미리보기를 제공하는 Spring Boot 프로젝트입니다.
 
@@ -13,7 +13,7 @@
 | 빌드 | Gradle Wrapper 9.8.2, Groovy DSL |
 | 테스트 | JUnit Jupiter, Mockito, Spring Boot Test, MockMvc |
 | 외부 HTTP 호출 | Spring RestClient |
-| 저장 방식 | 메모리 저장소, 별도 DB 없음 |
+| 저장 방식 | MySQL 8.0.29(prod), 메모리(default·test) |
 | 서버 포트 | 8081 |
 | 기존 화면 | HTML·CSS·JavaScript, Fetch API |
 
@@ -23,7 +23,7 @@
 .\gradlew.bat bootRun
 ```
 
-테스트와 빌드 명령입니다.
+테스트와 빌드 명령입니다. 전체 테스트에는 아래의 테스트용 MySQL DB·계정 준비가 필요합니다.
 
 ```powershell
 .\gradlew.bat test
@@ -34,7 +34,116 @@ macOS / Linux에서는 `./gradlew bootRun`, `./gradlew test`, `./gradlew build`�
 
 기본 주소는 `http://localhost:8081`이고, 기존 위시리스트 화면은 [http://localhost:8081/](http://localhost:8081/)에서 사용합니다. 외부 상품·장바구니·금액 미리보기는 현재 HTTP API로 제공합니다. 외부 프론트엔드 라이브러리나 CDN은 사용하지 않습니다.
 
-서버를 재시작하면 위시리스트와 장바구니 데이터가 초기화됩니다. 실제 DummyJSON 조회·가져오기에는 인터넷 연결이 필요하며, 자동 테스트는 실제 외부 서버를 호출하지 않습니다.
+`default`·`test`의 메모리 실행에서는 재시작 시 데이터가 초기화됩니다. `prod`는 MySQL에 위시리스트·장바구니를 저장하므로 같은 DB로 재시작하면 복원됩니다. 실제 DummyJSON 조회·가져오기에는 인터넷 연결이 필요하며, 자동 테스트는 실제 외부 서버를 호출하지 않습니다.
+
+## MySQL 연결과 테이블 설계
+
+### 실행 프로필
+
+| 프로필 | ItemRepository / CartRepository | DB 연결 |
+|---|---|---|
+| default | 메모리 구현체 | 자동 연결 설정 제외 |
+| test | 메모리 구현체 | 자동 연결 설정 제외 |
+| prod | DB 구현체 | 앱 MySQL wishlist |
+| prod + dbtest | DB 구현체 | 테스트 전용 MySQL wishlist_repository_test |
+
+`application-default.properties`와 `application-test.properties`에서 DataSource 자동 설정을 제외합니다. DB Repository는 `@Profile("prod")`, 메모리 Repository는 `@Profile({"default", "test"})`로 선택합니다. DB 통합 테스트만 `prod`와 `dbtest`를 함께 활성화합니다.
+
+현재 앱 연결 설정은 `src/main/resources/application.properties`에 있습니다.
+
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3307/wishlist
+spring.datasource.username=root
+spring.datasource.password=${DB_PASSWORD}
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+```
+
+Spring JDBC와 MySQL 드라이버를 사용하며 JPA로 전환하지 않았습니다. HTTP 경로와 ItemRepository 계약은 유지하고, CartRepository에는 변경을 명시적으로 저장할 `save(Cart)`를 추가했습니다.
+
+### Docker와 앱 실행
+
+Docker Desktop을 실행한 뒤 개인 과제용 컨테이너를 준비합니다. 기존 연습 컨테이너와 이름·포트·볼륨을 구분합니다. 아래 생성 명령은 처음 한 번 사용하며, 이미 있다면 `docker start wishlist-mysql`로 실행합니다.
+
+```powershell
+$env:MYSQL_ROOT_PASSWORD = Read-Host "새 MySQL 비밀번호"
+docker run --name wishlist-mysql -p 3307:3306 -e MYSQL_ROOT_PASSWORD -e MYSQL_DATABASE=wishlist -v wishlist-mysql-data:/var/lib/mysql -d mysql:8.0.29 --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+```
+
+MySQL에 접속합니다. 이 명령은 IntelliJ Terminal의 PowerShell에서 실행하고, 비밀번호는 위에서 정한 값으로 입력합니다.
+
+```powershell
+docker exec -it wishlist-mysql mysql --default-character-set=utf8mb4 -u root -p wishlist
+```
+
+첫 구성 시 `mysql>`에서 [items.sql](src/main/resources/db/items.sql), [cart.sql](src/main/resources/db/cart.sql)의 SQL을 실행합니다. 파일에 저장하는 것만으로 앱 DB에 자동 실행되지는 않습니다. 기존 데이터가 있는 앱 DB에는 생성문을 다시 실행하거나 테이블을 초기화하지 않습니다.
+
+서버용 PowerShell 탭에서 실행합니다. SQL을 입력하는 `mysql>` 탭과 구분합니다.
+
+```powershell
+$env:DB_PASSWORD = Read-Host "MySQL 비밀번호"
+.\gradlew.bat --console=plain bootRun --args="--spring.profiles.active=prod"
+```
+
+같은 볼륨·DB를 유지하면 앱을 종료했다 다시 실행해도 데이터가 복원됩니다. 연결 비밀번호는 Git에 기록하지 않습니다.
+
+### 테이블·자료형·NULL·제약
+
+| 테이블 | 저장할 값 | 주요 제약과 의미 |
+|---|---|---|
+| items | id BIGINT, name VARCHAR(255), price INT, source_type VARCHAR(20), external_id BIGINT, stock INT | id는 AUTO_INCREMENT PK, 이름·가격·출처 NOT NULL, 외부 id·재고 NULL 허용 |
+| cart_items | id BIGINT, item_id BIGINT, name VARCHAR(255), unit_price BIGINT, source_type VARCHAR(20), stock INT, quantity INT | id PK, item_id UNIQUE, stock만 NULL 허용, 행 번호는 Cart가 부여 |
+| cart_state | id BIGINT, next_sequence BIGINT | 하나의 장바구니를 나타내는 id=1, next_sequence>=1 |
+
+- Java Long ↔ BIGINT, int/Integer ↔ INT로 저장합니다. 장바구니 단가와 합계 계산은 long입니다.
+- 수동 상품은 `MANUAL`, 외부 id·재고는 NULL입니다. RowMapper의 `getObject(..., Long.class/Integer.class)`로 NULL을 그대로 복원합니다.
+- 외부 상품은 `DUMMY_JSON`과 외부 id·재고를 함께 복원합니다. DB가 새로운 로컬 id를 생성하며 외부 id와 구분합니다.
+- `UNIQUE(source_type, external_id)`가 외부 상품 중복을 막습니다. NULL 외부 id를 가진 여러 수동 상품과 이름 중복은 허용합니다. 중복 키 예외를 기존 409 처리로 연결합니다.
+- 가격·재고의 음수와 장바구니 수량 범위는 CHECK 제약으로도 검사합니다.
+- `cart_items.item_id`에는 items를 참조하는 FK를 두지 않았습니다. 원본 삭제를 막거나 장바구니를 연쇄 삭제하지 않고, 복사본이 남도록 설계했습니다.
+- `cart_state.next_sequence`를 별도 보관하므로 마지막 행이나 전체 행을 삭제해도 재시작 후 번호를 재사용하지 않습니다.
+- 목록·검색·장바구니 조회에 `ORDER BY id ASC`를 명시합니다. 추천은 이 순서의 목록을 가격으로 안정 정렬하여 가격 동률의 등록 순서를 보존합니다.
+- 이름 검색은 `LOCATE(CAST(:name AS BINARY), CAST(name AS BINARY)) > 0`으로 대소문자와 `%`, `_`를 기존 contains()처럼 문자 그대로 비교합니다.
+
+### 저장 단위와 트랜잭션
+
+장바구니는 서버에 하나이며 최대 20종입니다. DB의 `save(Cart)`는 다음 작업을 한 트랜잭션으로 수행합니다.
+
+1. 기존 cart_items 삭제
+2. 현재 Cart의 항목들을 기존 행 id·복사본 그대로 INSERT
+3. cart_state의 다음 행 번호 UPDATE
+
+CartService의 담기·수량 변경·삭제에 `@Transactional`을 적용해 조회·변경·저장을 묶습니다. DatabaseCartRepository의 save에도 적용하여 저장소를 직접 호출해도 여러 SQL이 함께 성공하거나 취소됩니다. Service에서 호출하면 기본 전파 방식으로 같은 트랜잭션에 참여합니다.
+
+트랜잭션이 없다면 두 번째 INSERT나 마지막 UPDATE 실패 시 기존 행이 삭제된 채 일부 항목만 남을 수 있습니다. 통합 테스트에서 각각 UNIQUE·CHECK 제약 오류를 발생시켜 앞선 DELETE·INSERT와 번호 변경까지 전부 취소되는지 검증했습니다. 테스트 메서드 자체에는 `@Transactional`을 붙이지 않아 저장소의 실제 롤백 결과를 확인합니다.
+
+외부 조회·가격 환산은 INSERT 전에 수행하므로 외부 요청 실패·환산 실패 시 기존 상품과 장바구니를 변경하지 않습니다. 위시리스트 등록·수정·삭제는 각 한 번의 쓰기입니다. 쿠폰·미리보기는 조회와 계산만 수행하며 save를 호출하지 않습니다.
+
+## 테스트 DB 준비
+
+앱 DB `wishlist`와 별도로 `wishlist_repository_test`를 사용합니다. `mysql>` 탭에서 최초 한 번 준비합니다.
+
+```sql
+CREATE DATABASE IF NOT EXISTS wishlist_repository_test
+    DEFAULT CHARACTER SET utf8mb4;
+CREATE USER IF NOT EXISTS 'wishlist_repository_test_user'@'%'
+    IDENTIFIED BY 'wishlist_test_only';
+GRANT ALL PRIVILEGES ON wishlist_repository_test.*
+    TO 'wishlist_repository_test_user'@'%';
+```
+
+위 계정·암호는 로컬 테스트 전용이며 앱 root 계정·비밀번호와 별개입니다. 앱 DB 권한은 부여하지 않습니다. 테스트 접속 설정은 `src/test/resources/application-dbtest.properties`에만 있습니다. 테스트는 실제 MySQL 8.0.29에 연결하고, 앱의 테이블 생성 SQL을 재사용합니다.
+
+각 DB 테스트 시작 시 실제 DB 이름과 인증 계정이 위 값인지 확인한 뒤 **테스트 DB의 테이블만** 재생성합니다. 앱 DB나 root에 연결되면 초기화 전에 실패하도록 했습니다. 이 DB는 반복 실행되는 테스트 전용 공간입니다. 테스트를 병렬로 실행하지 않습니다.
+
+```powershell
+# 기존 테스트와 DB 테스트 전체
+.\gradlew.bat --console=plain test
+
+# DB 통합 테스트 27개만
+.\gradlew.bat --console=plain test --tests "*Database*Test"
+```
+
+이전 단위·HTTP·Spring 연결 테스트 131개는 기존 메모리 방식으로 유지합니다. 추가 DB 테스트는 외부 Client를 Mockito 대역으로 교체하여 실제 DummyJSON을 호출하지 않습니다.
 
 ## 단계별 완료 범위
 
@@ -45,6 +154,7 @@ macOS / Linux에서는 `./gradlew bootRun`, `./gradlew test`, `./gradlew build`�
 | 2단계 | 장바구니 담기·조회·수량 변경·삭제, 수량·종류·재고 제한, 복사한 값 보존 | 완료 |
 | 2단계 | 쿠폰·배송비 포함 금액 미리보기, 오류 응답과 실패 후 데이터 보존 | 완료 |
 | 보조 기능 | 수동 상품 수정·위시리스트 상품 삭제 | 완료 |
+| DB 연동 | 위시리스트·장바구니 저장 및 복원, 중복 제약, 트랜잭션, 별도 MySQL DB 통합 테스트 | 완료 |
 | 3단계 선택 | 배송비 포함 최저 금액 쿠폰 추천, 외부 상품·장바구니용 AI 화면 | 미구현 |
 
 ## 패키지 구조와 클래스 책임
@@ -71,6 +181,7 @@ com.example.personal_project
 │   └── EntityNotFoundException
 └── infrastructure
     ├── MemoryItemRepository / MemoryCartRepository
+    ├── DatabaseItemRepository / DatabaseCartRepository
     └── DummyJsonClient / DummyJsonProduct / DummyJsonProductList
 ```
 
@@ -89,6 +200,8 @@ com.example.personal_project
 | Repository 인터페이스 | 필요한 저장·조회 동작 정의 |
 | MemoryItemRepository | 메모리 목록에 Item 저장·조회·수정·삭제, 로컬 id 생성 |
 | MemoryCartRepository | 서버 메모리에서 하나의 Cart 보관 |
+| DatabaseItemRepository | SQL로 위시리스트 저장·조회·수정·삭제, DB 생성 id 수신 및 행 복원 |
+| DatabaseCartRepository | 장바구니 행·복사본·다음 번호의 SQL 저장과 복원 |
 | DummyJsonClient | RestClient로 외부 HTTP 호출, 페이징·검색어 검사, 외부 오류 변환 |
 | DummyJsonProduct / DummyJsonProductList | DummyJSON에서 받은 JSON 응답 보관 |
 | GlobalExceptionHandler | 입력 오류·대상 없음·규칙 충돌을 400·404·409로 변환 |
@@ -244,21 +357,24 @@ GET /cart/preview?couponCode=FIXED15000
 
 외부 Client 테스트는 `MockRestServiceServer`로 가짜 응답·연결 실패·시간 초과 예외를 준비합니다. Service·HTTP 연계 테스트의 외부 호출은 Mockito Client 대역을 사용하며 실제 DummyJSON에 접속하지 않습니다. 실제 네트워크에서 3초·5초가 경과하는지 측정한 테스트는 아닙니다.
 
-현재 소스와 설정을 그대로 복사한 검증 폴더에서 `.\gradlew.bat --offline test --console=plain`을 실행하여 `BUILD SUCCESSFUL`을 확인했습니다. 원본 폴더에서 Gradle 프로세스를 시작하는 실행 환경의 권한 제한 때문에 복사본을 사용했으며, 아래 수치는 그 실행의 테스트 결과 XML 기준입니다.
+DB 연동 후 현재 소스와 설정을 그대로 복사한 검증 폴더에서 `.\gradlew.bat --offline test --console=plain`을 실행하여 `BUILD SUCCESSFUL`을 확인했습니다. 원본 폴더에서 Gradle 프로세스를 시작하는 실행 환경의 권한 제한 때문에 복사본을 사용했으며, 아래 수치는 그 실행의 테스트 결과 XML 기준입니다.
 
 | 테스트 클래스 | 실행 | 실패 | 오류 | 건너뜀 |
 |---|---:|---:|---:|---:|
+| PersonalProjectApplicationTests | 1 | 0 | 0 | 0 |
+| CartServiceIntegrationTest | 2 | 0 | 0 | 0 |
 | ItemServiceTest | 23 | 0 | 0 | 0 |
 | ItemServiceUnitTest | 11 | 0 | 0 | 0 |
 | CartItemTest | 12 | 0 | 0 | 0 |
-| CartTest | 22 | 0 | 0 | 0 |
 | CartPreviewTest | 8 | 0 | 0 | 0 |
+| CartTest | 22 | 0 | 0 | 0 |
+| DatabaseApiIntegrationTest | 9 | 0 | 0 | 0 |
+| DatabaseCartRepositoryTest | 8 | 0 | 0 | 0 |
+| DatabaseItemRepositoryTest | 10 | 0 | 0 | 0 |
 | DummyJsonClientTest | 20 | 0 | 0 | 0 |
 | CartControllerTest | 26 | 0 | 0 | 0 |
 | CartPreviewControllerTest | 6 | 0 | 0 | 0 |
-| CartServiceIntegrationTest | 2 | 0 | 0 | 0 |
-| PersonalProjectApplicationTests | 1 | 0 | 0 | 0 |
-| **합계** | **131** | **0** | **0** | **0** |
+| **합계** | **158** | **0** | **0** | **0** |
 
 테스트 실행 후 보고서는 실행한 프로젝트의 `build/reports/tests/test/index.html`, XML은 `build/test-results/test/`에서 확인할 수 있습니다. 위 기록은 test 작업 결과이며, 별도 build 작업 완료를 의미하지 않습니다.
 
@@ -292,12 +408,36 @@ GET /cart/preview?couponCode=FIXED15000
 | PERCENT10 | 11,000 | 99,000 | 5,000 | 104,000 |
 | FIXED15000 | 15,000 | 95,000 | 5,000 | 100,000 |
 
-## 제한사항과 남은 작업
+## DB 연동 QA 기록
 
-- 서버 메모리에 하나의 장바구니를 보관하며 사용자별로 구분하지 않습니다. 재시작하면 데이터가 사라집니다.
-- 동시 요청에서 중복 검사와 저장·수량 변경을 하나의 작업으로 보장하는 처리는 추가하지 않았습니다.
-- 재고 예약·차감·실제 결제·실시간 환율·외부 상품 자동 갱신은 하지 않습니다.
-- 외부 가격은 환산 후 int 범위 안인 값을 전제로 하며, 비정상 외부 필드·환산 범위 초과에 대한 전용 오류 처리는 남아 있습니다.
-- 기존 화면은 위시리스트 등록·조회·검색·추천용입니다. 외부 상품·장바구니 화면과 최적 쿠폰 자동 추천은 선택 기능으로 남겨두었습니다.
-- 오류 응답 본문 형식 통일은 남은 개선 사항입니다.
-- 제출 전 개인 Fork에 코드·테스트·README를 Push하고, 조직 원본을 대상으로 관련 Issue·이전 PR 링크·이번 변경 범위를 포함한 PR을 작성합니다. 원본 main에는 병합하지 않고 제출 브랜치를 보존합니다.
+### 사용자와 수동으로 확인한 결과
+
+| 시나리오 | 실제 결과 |
+|---|---|
+| 수동 상품 등록 후 MySQL 조회 | 노트 12,000원·MANUAL·외부 id/재고 NULL 저장 |
+| 앱 재시작 후 기존 상품 조회 | 같은 DB에서 기존 상품 복원 |
+| 수동 수정·잘못된 수정 | 볼펜 2,000원 수정 성공, 음수 가격은 400과 기존 값 유지 |
+| 외부 가져오기·중복·수정 거부 | 9.99 → 9,990원, DUMMY_JSON·external_id=1·stock=99 저장, 중복·외부 수정 409 |
+| 위시리스트 삭제 | 204, 삭제 후 조회·재삭제 404 |
+| 장바구니 담기·재시작 | 원본 id=2에서 행 id=1·수량 2 복사, 재시작 후 복원 |
+| 수량 변경·합산 실패 | 수량 3 저장, 3개 추가하여 6개가 되는 요청은 409·수량과 다음 번호 유지 |
+| 삭제 후 다시 담기 | 삭제한 번호 재사용 없이 행 id=2·next_sequence=3으로 진행 |
+| 원본 삭제 후 장바구니 사용 | 원본 items는 비고 cart_items의 행 id=3·단가 9,990원·재고 99 유지, 수량 2로 변경 |
+| 미리보기 전후 DB 상태 | 행 id=3·단가 9,990원·재고 99·수량 2·next_sequence=4 유지 |
+| MySQL 터미널 한글 표시 | HEX(name)으로 UTF-8 정상 저장 확인, SET NAMES utf8mb4 후 표시 정상 |
+
+### 추가 자동 검증 결과
+
+별도 MySQL DB에서 DB Repository 18개와 DB API·Service 연계 9개, 합계 27개 테스트를 통과했습니다. 수동으로 아직 확인하지 않은 원본 수정 후 복사본 유지·현재 값 재담기, 이름 중복·가격 0·동률 순서, SQL 중간 실패 롤백은 자동 테스트로 검증했습니다.
+
+- DB 생성 id, NULL·출처·외부 id·재고의 객체 복원, 새 Repository 객체를 통한 재조회
+- SQL 목록·검색의 등록 순서, 대소문자와 특수문자의 문자 그대로 검색
+- Service 사전 검사 없이 DB UNIQUE가 중복을 차단하고 기존 값 보존
+- 원본 수정·삭제 후 장바구니 유지, 재담기 시 현재 이름·단가·재고 복사
+- 모든 장바구니 행 삭제 후에도 다음 번호 보존
+- 두 번째 INSERT 실패 및 마지막 UPDATE 실패 시 전체 저장 롤백
+- 입력 400·대상 없음 404·규칙 충돌 409·외부 실패 502와 DB 보존
+- 쿠폰별 최종 금액·빈 장바구니·정상/실패 미리보기 후 저장 상태 보존
+
+검증은 현재 소스와 설정을 그대로 복사한 폴더에서 실제 로컬 MySQL 테스트 DB를 연결하여 수행했습니다. Gradle 결과는 **158개 실행·실패 0·오류 0·건너뜀 0, BUILD SUCCESSFUL**입니다. 실행 환경의 원본 폴더 접근 제한 때문에 복사본을 사용했고, 앱 DB를 초기화하지 않았습니다.
+
