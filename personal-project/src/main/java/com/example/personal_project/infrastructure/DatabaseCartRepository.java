@@ -60,45 +60,95 @@ public class DatabaseCartRepository implements CartRepository {
     @Override
     @Transactional
     public void save(Cart cart) {
-        // 기존 저장 목록 삭제
-        namedParameterJdbcTemplate.update(
-                "DELETE FROM cart_items",
-                new MapSqlParameterSource()
-        );
+        Cart storedCart = getCart();
+        List<CartItem> storedItems = storedCart.getItems();
+        List<CartItem> currentItems = cart.getItems();
 
-        // 현재 장바구니 항목 저장
-        String sql = """
-            INSERT INTO cart_items
-                (id, item_id, name, unit_price, source_type, stock, quantity)
-            VALUES
-                (:id, :itemId, :name, :unitPrice, :sourceType, :stock, :quantity)
-            """;
-
-        for (CartItem item : cart.getItems()) {
-            MapSqlParameterSource parameters = new MapSqlParameterSource()
-                    .addValue("id", item.getId())
-                    .addValue("itemId", item.getItemId())
-                    .addValue("name", item.getName())
-                    .addValue("unitPrice", item.getUnitPrice())
-                    .addValue("sourceType", item.getSourceType().name())
-                    .addValue("stock", item.getStock())
-                    .addValue("quantity", item.getQuantity());
-
-            namedParameterJdbcTemplate.update(sql, parameters);
+        // 현재 Cart에서 삭제한 항목만 DB에서도 삭제
+        for (CartItem storedItem : storedItems) {
+            if (findItemInList(currentItems, storedItem.getId()) == null) {
+                deleteItem(storedItem.getId());
+            }
         }
 
-        // 다음 행 번호 저장
-        String stateSql = """
-            UPDATE cart_state
-            SET next_sequence = :nextSequence
-            WHERE id = :id
-            """;
+        for (CartItem currentItem : currentItems) {
+            CartItem storedItem = findItemInList(storedItems, currentItem.getId());
+            if (storedItem == null) {
+                // 새로 담은 항목만 INSERT
+                insertItem(currentItem);
+            } else if (storedItem.getQuantity() != currentItem.getQuantity()) {
+                // 기존 항목은 수량만 UPDATE. 처음 복사한 이름·단가·재고는 그대로 둠
+                updateQuantity(currentItem);
+            }
+        }
 
-        MapSqlParameterSource stateParameters = new MapSqlParameterSource()
+        // 새 행 번호가 부여된 경우에만 다음 번호 변경
+        if (storedCart.getNextSequence() != cart.getNextSequence()) {
+            updateNextSequence(cart.getNextSequence());
+        }
+    }
+
+    private CartItem findItemInList(List<CartItem> items, Long id) {
+        for (CartItem item : items) {
+            if (item.getId().equals(id)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private void insertItem(CartItem item) {
+        String sql = """
+                INSERT INTO cart_items
+                    (id, item_id, name, unit_price, source_type, stock, quantity)
+                VALUES
+                    (:id, :itemId, :name, :unitPrice, :sourceType, :stock, :quantity)
+                """;
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("id", item.getId())
+                .addValue("itemId", item.getItemId())
+                .addValue("name", item.getName())
+                .addValue("unitPrice", item.getUnitPrice())
+                .addValue("sourceType", item.getSourceType().name())
+                .addValue("stock", item.getStock())
+                .addValue("quantity", item.getQuantity());
+
+        namedParameterJdbcTemplate.update(sql, parameters);
+    }
+
+    private void updateQuantity(CartItem item) {
+        String sql = """
+                UPDATE cart_items
+                SET quantity = :quantity
+                WHERE id = :id
+                """;
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("id", item.getId())
+                .addValue("quantity", item.getQuantity());
+
+        namedParameterJdbcTemplate.update(sql, parameters);
+    }
+
+    private void deleteItem(Long id) {
+        String sql = "DELETE FROM cart_items WHERE id = :id";
+        MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
+        namedParameterJdbcTemplate.update(sql, parameters);
+    }
+
+    private void updateNextSequence(long nextSequence) {
+        String sql = """
+                UPDATE cart_state
+                SET next_sequence = :nextSequence
+                WHERE id = :id
+                """;
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("id", 1L)
-                .addValue("nextSequence", cart.getNextSequence());
+                .addValue("nextSequence", nextSequence);
 
-        namedParameterJdbcTemplate.update(stateSql, stateParameters);
+        namedParameterJdbcTemplate.update(sql, parameters);
     }
 
     private final RowMapper<CartItem> cartItemRowMapper =
