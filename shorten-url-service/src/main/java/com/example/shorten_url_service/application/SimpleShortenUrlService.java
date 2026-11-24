@@ -30,7 +30,7 @@ public class SimpleShortenUrlService {
         ShortenUrl shortenUrl = new ShortenUrl(originalUrl, shortenUrlKey);
 
 //        3.생성된 ShortenUrl을 레포지토리를 통해 저장
-        shortenUrlRepository.saveShortenUrl(shortenUrl);
+        shortenUrlRepository.insertShortenUrl(shortenUrl);
 
 //        4.ShortenUrl을 ShortenUrlCreateResponseDto로 변환하여 반환
         ShortenUrlCreateResponseDto shortenUrlCreateResponseDto = new ShortenUrlCreateResponseDto(shortenUrl);
@@ -76,9 +76,7 @@ public class SimpleShortenUrlService {
             throw new NotFoundShortenUrlException();
         }
 
-        shortenUrl.increaseRedirectCount();
-
-//        shortenUrlRepository.saveShortenUrl(shortenUrl);
+        shortenUrlRepository.increaseRedirectCount(shortenUrlKey);
 
         return shortenUrl.getOriginalUrl();
     }

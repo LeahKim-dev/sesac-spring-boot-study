@@ -10,9 +10,13 @@ public class ShortenUrl {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     public ShortenUrl(String originalUrl, String shortenUrlKey) {
+        this(originalUrl, shortenUrlKey, 0L);
+    }
+
+    public ShortenUrl(String originalUrl, String shortenUrlKey, Long redirectCount) {
         this.originalUrl = originalUrl;
         this.shortenUrlKey = shortenUrlKey;
-        this.redirectCount = 0L;
+        this.redirectCount = redirectCount;
     }
 
     public String getOriginalUrl() {
