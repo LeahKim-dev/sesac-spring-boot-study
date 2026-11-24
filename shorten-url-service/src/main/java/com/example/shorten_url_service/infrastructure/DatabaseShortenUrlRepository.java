@@ -2,38 +2,38 @@ package com.example.shorten_url_service.infrastructure;
 
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class DatabaseShortenUrlRepository implements ShortenUrlRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final ShortenUrlJpaRepository shortenUrlJpaRepository;
 
-    public DatabaseShortenUrlRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public DatabaseShortenUrlRepository(
+            ShortenUrlJpaRepository shortenUrlJpaRepository
+    ) {
+        this.shortenUrlJpaRepository = shortenUrlJpaRepository;
     }
 
+    @Override
     public ShortenUrl findShortenUrlByShortenUrlKey(String shortenUrlKey) {
-        String sql = """
-                SELECT original_url, shorten_url_key, redirect_count
-                FROM shorten_urls
-                WHERE shorten_url_key = ?
-                """;
+        Optional<ShortenUrlEntity> result =
+                shortenUrlJpaRepository.findByShortenUrlKey(shortenUrlKey);
 
-        List<ShortenUrl> results = jdbcTemplate.query(
-                sql, this::toShortenUrl, shortenUrlKey
-        );
-
-        if (results.isEmpty()) {
+        if (result.isEmpty()) {
             return null;
         }
 
-        return results.getFirst();
+        ShortenUrlEntity entity = result.get();
+        return new ShortenUrl(
+                entity.getOriginalUrl(),
+                entity.getShortenUrlKey(),
+                entity.getRedirectCount()
+        );
     }
 
     private ShortenUrl toShortenUrl(ResultSet row, int rowNum) throws SQLException {
@@ -44,28 +44,20 @@ public class DatabaseShortenUrlRepository implements ShortenUrlRepository {
         return new ShortenUrl(originalUrl, shortenUrlKey, redirectCount);
     }
 
+    @Override
     public void insertShortenUrl(ShortenUrl shortenUrl) {
-        String sql = """
-            INSERT INTO shorten_urls (original_url, shorten_url_key, redirect_count)
-            VALUES (?, ?, ?)
-            """;
-
-        jdbcTemplate.update(
-                sql,
+        ShortenUrlEntity entity = new ShortenUrlEntity(
                 shortenUrl.getOriginalUrl(),
                 shortenUrl.getShortenUrlKey(),
                 shortenUrl.getRedirectCount()
         );
+
+        shortenUrlJpaRepository.save(entity);
     }
 
+    @Override
     public void increaseRedirectCount(String shortenUrlKey) {
-        String sql = """
-            UPDATE shorten_urls
-            SET redirect_count = redirect_count + 1
-            WHERE shorten_url_key = ?
-            """;
-
-        jdbcTemplate.update(sql, shortenUrlKey);
+        shortenUrlJpaRepository.increaseRedirectCount(shortenUrlKey);
     }
 
 }

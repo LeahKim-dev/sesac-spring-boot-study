@@ -8,6 +8,7 @@ import com.example.shorten_url_service.presentation.ShortenUrlCreateRequestDto;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import com.example.shorten_url_service.presentation.ShortenUrlInformationDto;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.*;
 
@@ -20,6 +21,7 @@ public class SimpleShortenUrlService {
         this.shortenUrlRepository = shortenUrlRepository;
     }
 
+    @Transactional
     public ShortenUrlCreateResponseDto generateShortenUrl(
             ShortenUrlCreateRequestDto shortenUrlCreateRequestDto) {
 
@@ -54,6 +56,7 @@ public class SimpleShortenUrlService {
         throw new LackOfShortenUrlKeyException();
     }
 
+    @Transactional(readOnly = true)
     public ShortenUrlInformationDto getShortenUrlInformationByShortenUrlKey(String shortenUrlKey) {
         // 저장소야 shortenUrlKey에 해당하는 ShortenUrl 객체를 찾아줘
         ShortenUrl shortenUrl = shortenUrlRepository.findShortenUrlByShortenUrlKey(shortenUrlKey);
@@ -68,6 +71,7 @@ public class SimpleShortenUrlService {
         return shortenUrlInformationDto;
     }
 
+    @Transactional
     public String getOriginalUrlByShortenUrlKey(String shortenUrlKey) {
         ShortenUrl shortenUrl = shortenUrlRepository.findShortenUrlByShortenUrlKey(shortenUrlKey);
 
