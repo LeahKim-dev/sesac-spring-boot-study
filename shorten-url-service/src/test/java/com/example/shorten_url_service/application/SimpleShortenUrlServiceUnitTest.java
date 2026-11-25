@@ -1,14 +1,17 @@
 package com.example.shorten_url_service.application;
 
 import com.example.shorten_url_service.domain.LackOfShortenUrlKeyException;
+import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
+import com.example.shorten_url_service.infrastructure.PdfFileStorage;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateRequestDto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,6 +23,8 @@ import static org.mockito.Mockito.*;
 class SimpleShortenUrlServiceUnitTest {
     @Mock
     private ShortenUrlRepository shortenUrlRepository;
+    @Mock
+    private PdfFileStorage pdfFileStorage;
     @InjectMocks
     private SimpleShortenUrlService simpleShortenUrlService;
     @Test
@@ -57,5 +62,47 @@ class SimpleShortenUrlServiceUnitTest {
                 .insertShortenUrl(any(ShortenUrl.class));
 
         assertEquals("https://www.hanbit.co.kr/", response.getOriginalUrl());
+    }
+
+    @Test
+    void expiredPdfCannotBeLookedUpOrRedirected() {
+        String key = "12345678";
+        String fileName = "pdf-123.pdf";
+        when(shortenUrlRepository.findShortenUrlByShortenUrlKey(key))
+                .thenReturn(new ShortenUrl("/pdf/" + fileName, key));
+        when(pdfFileStorage.load(fileName)).thenReturn(null);
+
+        assertThrows(NotFoundShortenUrlException.class,
+                () -> simpleShortenUrlService.getShortenUrlInformationByShortenUrlKey(key));
+        assertThrows(NotFoundShortenUrlException.class,
+                () -> simpleShortenUrlService.getOriginalUrlByShortenUrlKey(key));
+
+        verify(shortenUrlRepository, never()).increaseRedirectCount(key);
+    }
+
+    @Test
+    void availablePdfCanBeOpened() {
+        String key = "12345678";
+        String fileName = "pdf-123.pdf";
+        String originalUrl = "/pdf/" + fileName;
+        when(shortenUrlRepository.findShortenUrlByShortenUrlKey(key))
+                .thenReturn(new ShortenUrl(originalUrl, key));
+        when(pdfFileStorage.load(fileName)).thenReturn(new ByteArrayResource(new byte[0]));
+
+        assertEquals(originalUrl, simpleShortenUrlService
+                .getShortenUrlInformationByShortenUrlKey(key).getOriginalUrl());
+        assertEquals(originalUrl, simpleShortenUrlService.getOriginalUrlByShortenUrlKey(key));
+        verify(shortenUrlRepository).increaseRedirectCount(key);
+    }
+
+    @Test
+    void ordinaryWebLinkDoesNotRequirePdfStorage() {
+        String key = "87654321";
+        String originalUrl = "https://example.com/";
+        when(shortenUrlRepository.findShortenUrlByShortenUrlKey(key))
+                .thenReturn(new ShortenUrl(originalUrl, key));
+
+        assertEquals(originalUrl, simpleShortenUrlService.getOriginalUrlByShortenUrlKey(key));
+        verifyNoInteractions(pdfFileStorage);
     }
 }

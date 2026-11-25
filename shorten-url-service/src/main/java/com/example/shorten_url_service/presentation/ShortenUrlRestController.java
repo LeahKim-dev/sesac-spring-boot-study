@@ -1,6 +1,7 @@
 package com.example.shorten_url_service.presentation;
 
 import com.example.shorten_url_service.application.SimpleShortenUrlService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +40,9 @@ public class ShortenUrlRestController {
         
         HttpHeaders httpHeaders = new HttpHeaders(); // 서버가 보낼 헤더를 담는 객체
         httpHeaders.setLocation(redirectUri); // 응답 헤더의 Location 항목에 그 주소를 넣기
+        if (originalUrl.startsWith("/pdf/")) {
+            httpHeaders.setCacheControl("no-store");
+        }
 
         return new ResponseEntity<>(httpHeaders, HttpStatus.MOVED_PERMANENTLY); // 301
     }
@@ -46,8 +50,10 @@ public class ShortenUrlRestController {
 //    3. 단축 URL 정보 조회 API
     @GetMapping("/shortenUrl/{shortenUrlKey}")
     public ShortenUrlInformationDto getShortenUrlInformation(
-            @PathVariable("shortenUrlKey") String shortenUrlKey
+            @PathVariable("shortenUrlKey") String shortenUrlKey,
+            HttpServletResponse response
     ) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         ShortenUrlInformationDto shortenUrlInformationDto = simpleShortenUrlService.getShortenUrlInformationByShortenUrlKey(shortenUrlKey);
 
         return shortenUrlInformationDto;

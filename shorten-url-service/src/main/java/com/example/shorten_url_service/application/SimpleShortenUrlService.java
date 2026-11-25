@@ -4,6 +4,7 @@ import com.example.shorten_url_service.domain.LackOfShortenUrlKeyException;
 import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
+import com.example.shorten_url_service.infrastructure.PdfFileStorage;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateRequestDto;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import com.example.shorten_url_service.presentation.ShortenUrlInformationDto;
@@ -16,16 +17,26 @@ import java.awt.*;
 @Service
 public class SimpleShortenUrlService {
     private final ShortenUrlRepository shortenUrlRepository;
+    private final PdfFileStorage pdfFileStorage;
 
     // 서비스를 만들 때 ShortenUrlRepository를 구현한 객체를 넣어줘
-    SimpleShortenUrlService(ShortenUrlRepository shortenUrlRepository) {
+    SimpleShortenUrlService(ShortenUrlRepository shortenUrlRepository, PdfFileStorage pdfFileStorage) {
         this.shortenUrlRepository = shortenUrlRepository;
+        this.pdfFileStorage = pdfFileStorage;
     }
 
     public ShortenUrlCreateResponseDto generateShortenUrl(
             ShortenUrlCreateRequestDto shortenUrlCreateRequestDto) {
 
         String originalUrl = shortenUrlCreateRequestDto.getOriginalUrl();
+
+        ShortenUrl shortenUrl = createAndSaveShortenUrl(originalUrl);
+
+        return new ShortenUrlCreateResponseDto(shortenUrl);
+    }
+
+    public ShortenUrlCreateResponseDto generatePdfShortenUrl(String fileName) {
+        String originalUrl = "/pdf/" + fileName;
 
         ShortenUrl shortenUrl = createAndSaveShortenUrl(originalUrl);
 
@@ -60,29 +71,37 @@ public class SimpleShortenUrlService {
         throw new LackOfShortenUrlKeyException();
     }
 
-    @Transactional(readOnly = true)
-    public ShortenUrlInformationDto getShortenUrlInformationByShortenUrlKey(String shortenUrlKey) {
-        // 저장소야 shortenUrlKey에 해당하는 ShortenUrl 객체를 찾아줘
-        ShortenUrl shortenUrl = shortenUrlRepository.findShortenUrlByShortenUrlKey(shortenUrlKey);
+    private ShortenUrl findAvailableShortenUrl(String shortenUrlKey) {
+        ShortenUrl shortenUrl =
+                shortenUrlRepository.findShortenUrlByShortenUrlKey(shortenUrlKey);
 
-        // 단축 URL을 찾지 못하는 상황
-        if ( shortenUrl == null) {
+        if (shortenUrl == null) {
             throw new NotFoundShortenUrlException();
         }
 
-        ShortenUrlInformationDto shortenUrlInformationDto = new ShortenUrlInformationDto(shortenUrl);
+        String originalUrl = shortenUrl.getOriginalUrl();
 
-        return shortenUrlInformationDto;
+        if (originalUrl.startsWith("/pdf/")) {
+            String fileName = originalUrl.substring("/pdf/".length());
+
+            if (pdfFileStorage.load(fileName) == null) {
+                throw new NotFoundShortenUrlException();
+            }
+        }
+
+        return shortenUrl;
+    }
+
+    @Transactional(readOnly = true)
+    public ShortenUrlInformationDto getShortenUrlInformationByShortenUrlKey(String shortenUrlKey) {
+        ShortenUrl shortenUrl = findAvailableShortenUrl(shortenUrlKey);
+
+        return new ShortenUrlInformationDto(shortenUrl);
     }
 
     @Transactional
     public String getOriginalUrlByShortenUrlKey(String shortenUrlKey) {
-        ShortenUrl shortenUrl = shortenUrlRepository.findShortenUrlByShortenUrlKey(shortenUrlKey);
-
-        // 단축 URL을 찾지 못하는 상황
-        if ( shortenUrl == null) {
-            throw new NotFoundShortenUrlException();
-        }
+        ShortenUrl shortenUrl = findAvailableShortenUrl(shortenUrlKey);
 
         shortenUrlRepository.increaseRedirectCount(shortenUrlKey);
 

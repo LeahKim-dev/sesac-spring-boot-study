@@ -1,0 +1,147 @@
+package com.example.shorten_url_service.infrastructure;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
+
+@Component
+public class PdfFileStorage {
+    private static final Duration PDF_VALIDITY = Duration.ofMinutes(10);
+    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
+    private static final Logger log = LoggerFactory.getLogger(PdfFileStorage.class);
+
+    private final Path directory;
+
+    public PdfFileStorage() {
+        this(Path.of(System.getProperty("java.io.tmpdir"), "print-link"));
+    }
+
+    PdfFileStorage(Path directory) {
+        this.directory = directory;
+    }
+
+    public String save(MultipartFile file) throws IOException {
+        validatePdf(file);
+        Files.createDirectories(directory);
+
+        Path temporaryFile = Files.createTempFile(directory, "pdf-", ".part");
+        String fileName = temporaryFile.getFileName().toString().replace(".part", ".pdf");
+        Path filePath = directory.resolve(fileName);
+
+        try {
+            file.transferTo(temporaryFile);
+            Files.setLastModifiedTime(temporaryFile, FileTime.from(Instant.now()));
+            Files.move(temporaryFile, filePath);
+            return fileName;
+        } catch (IOException | RuntimeException e) {
+            try {
+                Files.deleteIfExists(temporaryFile);
+            } catch (IOException deleteException) {
+                e.addSuppressed(deleteException);
+            }
+            throw e;
+        }
+    }
+
+    private void validatePdf(MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("빈 파일입니다.");
+        }
+
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException("PDF는 최대 10MB까지 업로드할 수 있습니다.");
+        }
+
+        try (InputStream inputStream = file.getInputStream()) {
+            String header = new String(inputStream.readNBytes(5), StandardCharsets.US_ASCII);
+
+            if (!header.equals("%PDF-")) {
+                throw new IllegalArgumentException("PDF 파일만 업로드할 수 있습니다.");
+            }
+        }
+    }
+
+    public void delete(String fileName) throws IOException {
+        if (!isPdfFileName(fileName)) {
+            throw new IllegalArgumentException("잘못된 PDF 파일명입니다.");
+        }
+        Files.deleteIfExists(directory.resolve(fileName));
+    }
+
+    public Resource load(String fileName) {
+        if (!isPdfFileName(fileName)) {
+            return null;
+        }
+
+        Path filePath = directory.resolve(fileName);
+
+        try {
+            if (!Files.isRegularFile(filePath, LinkOption.NOFOLLOW_LINKS) || isExpired(filePath)) {
+                return null;
+            }
+
+            return new FileSystemResource(filePath);
+        } catch (NoSuchFileException e) {
+            return null;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    public void deleteExpiredFiles() {
+        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(directory, "pdf-*")) {
+            for (Path filePath : files) {
+                String fileName = filePath.getFileName().toString();
+
+                if (!fileName.matches("pdf-[0-9]+\\.(pdf|part)")
+                        || !Files.isRegularFile(filePath, LinkOption.NOFOLLOW_LINKS)) {
+                    continue;
+                }
+
+                try {
+                    if (isExpired(filePath)) {
+                        Files.deleteIfExists(filePath);
+                    }
+                } catch (NoSuchFileException e) {
+                    // 이미 삭제된 파일은 다음 파일로 넘어간다.
+                } catch (IOException e) {
+                    log.warn("만료 파일 삭제 실패: {}", fileName, e);
+                }
+            }
+        } catch (IOException e) {
+            log.warn("임시 PDF 저장소 조회 실패", e);
+        }
+    }
+
+    private boolean isPdfFileName(String fileName) {
+        return fileName != null && fileName.matches("pdf-[0-9]+\\.pdf");
+    }
+
+    private boolean isExpired(Path filePath) throws IOException {
+        Instant savedAt = Files.getLastModifiedTime(filePath).toInstant();
+        Instant expiresAt = savedAt.plus(PDF_VALIDITY);
+        return !Instant.now().isBefore(expiresAt);
+    }
+}
