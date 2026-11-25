@@ -21,6 +21,7 @@ const openForm = document.getElementById("open-form");
 const accessCodeInput = document.getElementById("access-code");
 const openButton = document.getElementById("open-button");
 const openMessage = document.getElementById("open-message");
+const openFallback = document.getElementById("open-fallback");
 
 const codePattern = /^[0-9]{8}$/;
 const maxPdfSize = 10 * 1024 * 1024;
@@ -342,9 +343,15 @@ async function restoreIssuedPdf() {
     }
 }
 
+function hideOpenFallback() {
+    openFallback.hidden = true;
+    openFallback.removeAttribute("href");
+}
+
 accessCodeInput.addEventListener("input", () => {
     accessCodeInput.removeAttribute("aria-invalid");
     showMessage(openMessage, "");
+    hideOpenFallback();
 });
 
 openForm.addEventListener("submit", async (event) => {
@@ -355,6 +362,7 @@ openForm.addEventListener("submit", async (event) => {
 
     const code = accessCodeInput.value.trim();
     showMessage(openMessage, "");
+    hideOpenFallback();
 
     if (!codePattern.test(code)) {
         accessCodeInput.setAttribute("aria-invalid", "true");
@@ -366,6 +374,23 @@ openForm.addEventListener("submit", async (event) => {
     accessCodeInput.removeAttribute("aria-invalid");
     setBusy(openForm, openButton, true, "코드 확인 중…");
     accessCodeInput.readOnly = true;
+
+    // 사용자 클릭 시점에 새 탭을 열어 비동기 조회 후 팝업 차단되는 상황을 줄인다.
+    let destinationTab = null;
+    let opened = false;
+
+    try {
+        destinationTab = window.open("about:blank", "_blank");
+        if (destinationTab) {
+            destinationTab.opener = null;
+        }
+    } catch {
+        // 새 탭을 열 수 없으면 조회 성공 후 링크를 제공한다.
+        if (destinationTab && !destinationTab.closed) {
+            destinationTab.close();
+        }
+        destinationTab = null;
+    }
 
     try {
         const response = await fetch("/shortenUrl/" + code, {
@@ -388,11 +413,30 @@ openForm.addEventListener("submit", async (event) => {
             throw new Error("잘못된 응답");
         }
 
+        const target = new URL("/" + code, window.location.href).href;
+        if (destinationTab && !destinationTab.closed) {
+            try {
+                destinationTab.location.replace(target);
+                opened = true;
+            } catch {
+                // 새 탭이 닫혔거나 이동을 허용하지 않으면 직접 열기 링크를 이용한다.
+            }
+        }
+
         accessCodeInput.value = "";
-        window.location.assign("/" + code);
+        if (opened) {
+            showMessage(openMessage, "새 탭에서 자료를 열었어요.", "success");
+        } else {
+            openFallback.href = target;
+            openFallback.hidden = false;
+            showMessage(openMessage, "아래 버튼을 눌러 새 탭에서 자료를 열어 주세요.");
+        }
     } catch {
         showMessage(openMessage, "자료를 열 수 없어요. 연결을 확인하고 다시 시도해 주세요.", "error");
     } finally {
+        if (!opened && destinationTab && !destinationTab.closed) {
+            destinationTab.close();
+        }
         accessCodeInput.readOnly = false;
         setBusy(openForm, openButton, false, "자료 열기 →");
     }
