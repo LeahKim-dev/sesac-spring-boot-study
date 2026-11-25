@@ -1,6 +1,7 @@
 package com.example.shorten_url_service.application;
 
 import com.example.shorten_url_service.infrastructure.PdfFileStorage;
+import com.example.shorten_url_service.presentation.PdfUploadResponseDto;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -22,12 +23,14 @@ public class PdfUploadService {
         this.simpleShortenUrlService = simpleShortenUrlService;
     }
 
-    public ShortenUrlCreateResponseDto upload(MultipartFile file) throws IOException {
+    public PdfUploadResponseDto upload(MultipartFile file) throws IOException {
         String fileName = pdfFileStorage.save(file);
 
         try {
-            return simpleShortenUrlService.generatePdfShortenUrl(fileName);
-        } catch (RuntimeException e) {
+            String cancelToken = pdfFileStorage.createCancelToken(fileName);
+            ShortenUrlCreateResponseDto response = simpleShortenUrlService.generatePdfShortenUrl(fileName);
+            return new PdfUploadResponseDto(response.getOriginalUrl(), response.getShortenUrlKey(), cancelToken);
+        } catch (IOException | RuntimeException e) {
             try {
                 pdfFileStorage.delete(fileName);
             } catch (IOException deleteException) {
@@ -35,6 +38,10 @@ public class PdfUploadService {
             }
             throw e;
         }
+    }
+
+    public boolean cancel(String fileName, String cancelToken) throws IOException {
+        return pdfFileStorage.cancel(fileName, cancelToken);
     }
 
     public Resource getPdf(String fileName) {

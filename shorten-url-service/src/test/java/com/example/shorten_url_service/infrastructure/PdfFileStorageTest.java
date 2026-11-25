@@ -78,6 +78,40 @@ class PdfFileStorageTest {
         assertTrue(Files.exists(unrelatedFile));
     }
 
+    @Test
+    void onlyTheIssuedTokenCanCancelPdf() throws Exception {
+        PdfFileStorage storage = new PdfFileStorage(directory);
+        String fileName = storage.save(pdf());
+        String token = storage.createCancelToken(fileName);
+        String other = storage.save(pdf());
+        String otherToken = storage.createCancelToken(other);
+
+        assertFalse(storage.cancel(fileName, null));
+        assertFalse(storage.cancel(fileName, otherToken));
+        assertFalse(storage.cancel("../outside.pdf", token));
+        assertNotNull(storage.load(fileName));
+
+        assertTrue(new PdfFileStorage(directory).cancel(fileName, token));
+        assertNull(storage.load(fileName));
+        assertFalse(Files.exists(directory.resolve(fileName + ".cancel")));
+        assertNotNull(storage.load(other));
+        assertFalse(storage.cancel(fileName, token));
+    }
+
+    @Test
+    void expiredPdfCleanupRemovesItsCancelToken() throws Exception {
+        PdfFileStorage storage = new PdfFileStorage(directory);
+        String fileName = storage.save(pdf());
+        storage.createCancelToken(fileName);
+        Files.setLastModifiedTime(directory.resolve(fileName),
+                FileTime.from(Instant.now().minus(Duration.ofMinutes(11))));
+
+        storage.deleteExpiredFiles();
+
+        assertFalse(Files.exists(directory.resolve(fileName)));
+        assertFalse(Files.exists(directory.resolve(fileName + ".cancel")));
+    }
+
     private MockMultipartFile pdf() {
         return new MockMultipartFile("file", "test.pdf", "application/pdf",
                 "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.US_ASCII));

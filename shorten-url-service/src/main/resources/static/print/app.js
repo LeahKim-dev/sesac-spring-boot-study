@@ -13,6 +13,9 @@ const issuedValue = document.getElementById("issued-value");
 const copyButton = document.getElementById("copy-button");
 const copyMessage = document.getElementById("copy-message");
 const previewLink = document.getElementById("preview-link");
+const cancelActions = document.getElementById("cancel-actions");
+const cancelButton = document.getElementById("cancel-button");
+const cancelMessage = document.getElementById("cancel-message");
 
 const openForm = document.getElementById("open-form");
 const accessCodeInput = document.getElementById("access-code");
@@ -22,6 +25,11 @@ const openMessage = document.getElementById("open-message");
 const codePattern = /^[0-9]{8}$/;
 const maxPdfSize = 10 * 1024 * 1024;
 let sendMode = "pdf";
+let issuedPdf = null;
+let cancelling = false;
+const draftKey = "print-link-issued-pdf";
+const fileRoutePattern = /^\/pdf\/pdf-[0-9]+\.pdf$/;
+const tokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function showMessage(element, message, state = "") {
     element.textContent = message;
@@ -47,17 +55,35 @@ function validOriginalUrl(value) {
     }
 }
 
+function storeIssuedPdf(pdf) {
+    issuedPdf = pdf;
+    try {
+        if (pdf) {
+            sessionStorage.setItem(draftKey, JSON.stringify(pdf));
+        } else {
+            sessionStorage.removeItem(draftKey);
+        }
+    } catch {
+        // 현재 화면의 취소 기능은 저장소 접근 제한 시에도 사용할 수 있다.
+    }
+}
+
 function resetIssuedCode() {
     showMessage(sendMessage, "");
     showMessage(copyMessage, "");
     issuedCode.hidden = true;
     issuedValue.value = "";
     previewLink.removeAttribute("href");
+    cancelActions.hidden = true;
+    showMessage(cancelMessage, "");
+    storeIssuedPdf(null);
 }
 
 function updateSendFields() {
     const isPdf = sendMode === "pdf";
-    const busy = sendButton.disabled;
+    const busy = sendButton.disabled || cancelling;
+    cancelButton.disabled = busy;
+    copyButton.disabled = cancelling;
 
     pdfModeButton.setAttribute("aria-pressed", String(isPdf));
     linkModeButton.setAttribute("aria-pressed", String(!isPdf));
@@ -70,13 +96,13 @@ function updateSendFields() {
 }
 
 function chooseSendMode(mode) {
-    if (sendButton.disabled || sendMode === mode) {
+    if (sendButton.disabled || cancelling || sendMode === mode) {
         return;
     }
     sendMode = mode;
     originalUrlInput.removeAttribute("aria-invalid");
     pdfFileInput.removeAttribute("aria-invalid");
-    resetIssuedCode();
+    showMessage(sendMessage, "");
     updateSendFields();
 }
 
@@ -85,12 +111,15 @@ linkModeButton.addEventListener("click", () => chooseSendMode("link"));
 
 sendForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (sendButton.disabled) {
+    if (sendButton.disabled || cancelling) {
         return;
     }
 
     const isPdf = sendMode === "pdf";
-    resetIssuedCode();
+    showMessage(sendMessage, "");
+    if (issuedPdf && !window.confirm("새 코드를 발급하면 현재 PDF의 취소 버튼이 사라집니다. 계속할까요?")) {
+        return;
+    }
 
     let endpoint;
     let request;
@@ -169,6 +198,19 @@ sendForm.addEventListener("submit", async (event) => {
             throw new Error("잘못된 응답");
         }
 
+        if (isPdf && (!fileRoutePattern.test(data.originalUrl) || !tokenPattern.test(data.cancelToken))) {
+            throw new Error("PDF 취소 정보가 누락된 응답");
+        }
+
+        resetIssuedCode();
+        if (isPdf) {
+            storeIssuedPdf({
+                code: data.shortenUrlKey,
+                path: data.originalUrl,
+                token: data.cancelToken
+            });
+            cancelActions.hidden = false;
+        }
         issuedValue.value = data.shortenUrlKey;
         previewLink.href = "/" + data.shortenUrlKey;
         issuedNote.textContent = isPdf
@@ -186,12 +228,12 @@ sendForm.addEventListener("submit", async (event) => {
 
 originalUrlInput.addEventListener("input", () => {
     originalUrlInput.removeAttribute("aria-invalid");
-    resetIssuedCode();
+    showMessage(sendMessage, "");
 });
 
 pdfFileInput.addEventListener("change", () => {
     pdfFileInput.removeAttribute("aria-invalid");
-    resetIssuedCode();
+    showMessage(sendMessage, "");
 });
 
 copyButton.addEventListener("click", async () => {
@@ -224,6 +266,81 @@ copyButton.addEventListener("click", async () => {
 
     showMessage(copyMessage, "선택된 코드를 복사해 주세요.");
 });
+
+cancelButton.addEventListener("click", async () => {
+    if (!issuedPdf || cancelling || sendButton.disabled) {
+        return;
+    }
+    if (!window.confirm("전송을 취소하면 PDF가 삭제되고 발급된 코드는 사용할 수 없어요. 삭제할까요?")) {
+        return;
+    }
+
+    const pdf = issuedPdf;
+    cancelling = true;
+    sendButton.disabled = true;
+    cancelButton.textContent = "삭제 중…";
+    updateSendFields();
+    showMessage(cancelMessage, "");
+
+    try {
+        const response = await fetch(pdf.path, {
+            method: "DELETE",
+            headers: { "X-Cancel-Token": pdf.token },
+            cache: "no-store"
+        });
+
+        if (response.status === 404) {
+            const availability = await fetch("/shortenUrl/" + pdf.code, { cache: "no-store" });
+            if (availability.status !== 404) {
+                throw new Error("취소할 수 없는 PDF");
+            }
+        } else if (response.status !== 204) {
+            throw new Error("삭제 실패");
+        }
+
+        resetIssuedCode();
+        pdfFileInput.value = "";
+        showMessage(sendMessage, "전송이 취소되었어요. 이 코드는 더 이상 사용할 수 없어요.", "success");
+    } catch {
+        showMessage(cancelMessage, "자료를 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.", "error");
+    } finally {
+        cancelling = false;
+        sendButton.disabled = false;
+        cancelButton.textContent = "전송 취소 · PDF 삭제";
+        updateSendFields();
+    }
+});
+
+async function restoreIssuedPdf() {
+    try {
+        const pdf = JSON.parse(sessionStorage.getItem(draftKey));
+        if (!pdf || !codePattern.test(pdf.code)
+                || !fileRoutePattern.test(pdf.path) || !tokenPattern.test(pdf.token)) {
+            return;
+        }
+        const response = await fetch("/shortenUrl/" + pdf.code, { cache: "no-store" });
+        if (response.status === 404) {
+            storeIssuedPdf(null);
+            return;
+        }
+        if (!response.ok || issuedPdf || sendButton.disabled) {
+            return;
+        }
+
+        const data = await response.json();
+        if (data.originalUrl !== pdf.path || data.shortenUrlKey !== pdf.code || issuedPdf || sendButton.disabled) {
+            return;
+        }
+        issuedValue.value = pdf.code;
+        previewLink.href = "/" + pdf.code;
+        issuedNote.textContent = "공용 PC에서 이 코드를 입력하세요. PDF는 업로드 후 10분 동안 열 수 있어요.";
+        issuedCode.hidden = false;
+        cancelActions.hidden = false;
+        issuedPdf = pdf;
+    } catch {
+        // 브라우저 저장소 또는 서버에 일시적으로 연결할 수 없는 경우 새 발급은 계속 가능하다.
+    }
+}
 
 accessCodeInput.addEventListener("input", () => {
     accessCodeInput.removeAttribute("aria-invalid");
@@ -282,3 +399,4 @@ openForm.addEventListener("submit", async (event) => {
 });
 
 updateSendFields();
+restoreIssuedPdf();

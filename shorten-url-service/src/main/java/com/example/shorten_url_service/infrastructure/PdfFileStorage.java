@@ -18,8 +18,11 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 public class PdfFileStorage {
@@ -78,11 +81,52 @@ public class PdfFileStorage {
         }
     }
 
+    public String createCancelToken(String fileName) throws IOException {
+        if (!isPdfFileName(fileName)) {
+            throw new IllegalArgumentException("잘못된 PDF 파일명입니다.");
+        }
+
+        String token = UUID.randomUUID().toString();
+        Files.write(directory.resolve(fileName + ".cancel"), hashToken(token),
+                java.nio.file.StandardOpenOption.CREATE_NEW);
+        return token;
+    }
+
+    public boolean cancel(String fileName, String token) throws IOException {
+        if (!isPdfFileName(fileName) || token == null || token.length() != 36) {
+            return false;
+        }
+
+        byte[] savedHash;
+        try {
+            savedHash = Files.readAllBytes(directory.resolve(fileName + ".cancel"));
+        } catch (NoSuchFileException e) {
+            return false;
+        }
+
+        if (!MessageDigest.isEqual(savedHash, hashToken(token))) {
+            return false;
+        }
+
+        delete(fileName);
+        return true;
+    }
+
     public void delete(String fileName) throws IOException {
         if (!isPdfFileName(fileName)) {
             throw new IllegalArgumentException("잘못된 PDF 파일명입니다.");
         }
         Files.deleteIfExists(directory.resolve(fileName));
+        Files.deleteIfExists(directory.resolve(fileName + ".cancel"));
+    }
+
+    private byte[] hashToken(String token) {
+        try {
+            return MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.US_ASCII));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", e);
+        }
     }
 
     public Resource load(String fileName) {
@@ -115,14 +159,18 @@ public class PdfFileStorage {
             for (Path filePath : files) {
                 String fileName = filePath.getFileName().toString();
 
-                if (!fileName.matches("pdf-[0-9]+\\.(pdf|part)")
+                if (!fileName.matches("pdf-[0-9]+\\.(pdf|part|pdf\\.cancel)")
                         || !Files.isRegularFile(filePath, LinkOption.NOFOLLOW_LINKS)) {
                     continue;
                 }
 
                 try {
                     if (isExpired(filePath)) {
-                        Files.deleteIfExists(filePath);
+                        if (isPdfFileName(fileName)) {
+                            delete(fileName);
+                        } else {
+                            Files.deleteIfExists(filePath);
+                        }
                     }
                 } catch (NoSuchFileException e) {
                     // 이미 삭제된 파일은 다음 파일로 넘어간다.

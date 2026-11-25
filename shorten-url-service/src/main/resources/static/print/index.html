@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f6f6f2">
     <title>프린트 링크 | 휴대폰에서 PC로</title>
-    <link rel="stylesheet" href="/print/styles.css">
-    <script src="/print/app.js" defer></script>
+    <link rel="stylesheet" href="/print/styles.css?v=2">
+    <script src="/print/app.js?v=2" defer></script>
 </head>
 <body>
     <header class="site-header">
@@ -70,6 +70,11 @@
                         <a class="text-link" id="preview-link" href="/" target="_blank" rel="noopener">이 기기에서 열기 ↗</a>
                     </div>
                     <p class="form-message" id="copy-message" aria-live="polite" hidden></p>
+                    <div id="cancel-actions" class="cancel-actions" hidden>
+                        <button class="button cancel-button" id="cancel-button" type="button">전송 취소 · PDF 삭제</button>
+                        <p class="field-help">출력이 끝났거나 잘못 보낸 자료는 바로 삭제할 수 있어요.</p>
+                        <p class="form-message" id="cancel-message" aria-live="polite" hidden></p>
+                    </div>
                 </div>
             </article>
 

@@ -19,7 +19,7 @@ public class PdfRestController {
     }
 
     @PostMapping(value = "/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ShortenUrlCreateResponseDto upload(
+    public PdfUploadResponseDto upload(
             @RequestParam("file") MultipartFile file) throws IOException {
 
         try {
@@ -27,6 +27,17 @@ public class PdfRestController {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
+    }
+
+    @DeleteMapping("/pdf/{fileName}")
+    public ResponseEntity<Void> cancel(
+            @PathVariable String fileName,
+            @RequestHeader("X-Cancel-Token") String cancelToken) throws IOException {
+
+        if (!pdfUploadService.cancel(fileName, cancelToken)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/pdf/{fileName}")

@@ -461,6 +461,25 @@ input[type="file"]::file-selector-button {
     word-break: keep-all;
 }
 
+.cancel-actions {
+    border-top: 1px solid #d0e4db;
+    margin-top: 18px;
+    padding-top: 14px;
+}
+
+.cancel-button {
+    min-height: 44px;
+    padding: 9px 14px;
+    border-color: #d5b7bb;
+    color: var(--error);
+    background: var(--paper);
+    font-size: 13px;
+}
+
+.cancel-button:hover:not(:disabled) {
+    background: #faeeef;
+}
+
 @media (max-width: 760px) {
     .header-inner {
         padding: 17px 20px;
