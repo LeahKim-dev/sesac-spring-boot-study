@@ -30,7 +30,7 @@ public class ShortenUrlRestController {
     }
 
 //    2. 단축 URL 리다이렉트 API
-    @GetMapping("/{shortenUrlKey}")
+    @GetMapping("/{shortenUrlKey:[0-9]{8}}")
     public ResponseEntity<?> redirectShortenUrl(
             @PathVariable String shortenUrlKey
     ) throws URISyntaxException {
@@ -40,15 +40,13 @@ public class ShortenUrlRestController {
         
         HttpHeaders httpHeaders = new HttpHeaders(); // 서버가 보낼 헤더를 담는 객체
         httpHeaders.setLocation(redirectUri); // 응답 헤더의 Location 항목에 그 주소를 넣기
-        if (originalUrl.startsWith("/pdf/")) {
-            httpHeaders.setCacheControl("no-store");
-        }
+        httpHeaders.setCacheControl("no-store");
 
         return new ResponseEntity<>(httpHeaders, HttpStatus.MOVED_PERMANENTLY); // 301
     }
 
 //    3. 단축 URL 정보 조회 API
-    @GetMapping("/shortenUrl/{shortenUrlKey}")
+    @GetMapping("/shortenUrl/{shortenUrlKey:[0-9]{8}}")
     public ShortenUrlInformationDto getShortenUrlInformation(
             @PathVariable("shortenUrlKey") String shortenUrlKey,
             HttpServletResponse response

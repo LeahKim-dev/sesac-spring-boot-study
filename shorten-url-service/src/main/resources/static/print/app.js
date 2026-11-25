@@ -164,6 +164,14 @@ sendForm.addEventListener("submit", async (event) => {
             return;
         }
 
+        const encodedLength = originalUrl.normalize("NFC").replace(/[^\x00-\x7F]+/gu, encodeURIComponent).length;
+        if (originalUrl.length > 2048 || encodedLength > 2048) {
+            originalUrlInput.setAttribute("aria-invalid", "true");
+            showMessage(sendMessage, "링크가 너무 길어요. 한글 등은 인코딩한 뒤 최대 2,048자까지 보낼 수 있어요.", "error");
+            originalUrlInput.focus();
+            return;
+        }
+
         originalUrlInput.removeAttribute("aria-invalid");
         endpoint = "/shortenUrl";
         request = {
