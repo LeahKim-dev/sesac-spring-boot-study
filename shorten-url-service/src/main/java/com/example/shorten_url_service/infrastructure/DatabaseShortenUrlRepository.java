@@ -3,6 +3,7 @@ package com.example.shorten_url_service.infrastructure;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -45,6 +46,7 @@ public class DatabaseShortenUrlRepository implements ShortenUrlRepository {
     }
 
     @Override
+    @Transactional
     public void insertShortenUrl(ShortenUrl shortenUrl) {
         ShortenUrlEntity entity = new ShortenUrlEntity(
                 shortenUrl.getOriginalUrl(),

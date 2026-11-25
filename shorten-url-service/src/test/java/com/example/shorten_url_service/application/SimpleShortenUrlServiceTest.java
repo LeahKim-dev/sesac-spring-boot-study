@@ -1,20 +1,25 @@
 package com.example.shorten_url_service.application;
 
 import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
+import com.example.shorten_url_service.domain.ShortenUrl;
+import com.example.shorten_url_service.domain.ShortenUrlRepository;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateRequestDto;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class SimpleShortenUrlServiceTest {
     @Autowired
     private SimpleShortenUrlService simpleShortenUrlService;
+
+    @Autowired
+    private ShortenUrlRepository shortenUrlRepository;
 
     // 단축 URL을 생성한 후 조회 되는지
     @Test
@@ -40,6 +45,26 @@ class SimpleShortenUrlServiceTest {
 
         assertThrows(NotFoundShortenUrlException.class,
                 () -> simpleShortenUrlService.getOriginalUrlByShortenUrlKey(missingKey));
+    }
+
+    @Test
+    void 중복_키를_저장해도_기존_URL은_유지된다() {
+        ShortenUrlCreateRequestDto request =
+                new ShortenUrlCreateRequestDto("https://www.hanbit.co.kr/");
+
+        var response = simpleShortenUrlService.generateShortenUrl(request);
+        String shortenUrlKey = response.getShortenUrlKey();
+
+        ShortenUrl duplicateUrl =
+                new ShortenUrl("https://example.com/", shortenUrlKey);
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> shortenUrlRepository.insertShortenUrl(duplicateUrl));
+
+        ShortenUrl savedUrl =
+                shortenUrlRepository.findShortenUrlByShortenUrlKey(shortenUrlKey);
+
+        assertEquals("https://www.hanbit.co.kr/", savedUrl.getOriginalUrl());
     }
 }
 

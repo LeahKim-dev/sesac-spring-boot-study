@@ -9,11 +9,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SimpleShortenUrlServiceUnitTest {
@@ -32,5 +33,29 @@ class SimpleShortenUrlServiceUnitTest {
 
         assertThrows(LackOfShortenUrlKeyException.class,
                 () -> simpleShortenUrlService.generateShortenUrl(request));
+    }
+
+    @Test
+    void 저장_중_키가_중복되면_다시_저장한다() {
+        ShortenUrlCreateRequestDto request =
+                new ShortenUrlCreateRequestDto("https://www.hanbit.co.kr/");
+
+        ShortenUrl existingUrl =
+                new ShortenUrl("https://example.com/", "12345678");
+
+        when(shortenUrlRepository.findShortenUrlByShortenUrlKey(anyString()))
+                .thenReturn(null, existingUrl, null);
+
+        doThrow(new DataIntegrityViolationException("중복 키"))
+                .doNothing()
+                .when(shortenUrlRepository)
+                .insertShortenUrl(any(ShortenUrl.class));
+
+        var response = simpleShortenUrlService.generateShortenUrl(request);
+
+        verify(shortenUrlRepository, times(2))
+                .insertShortenUrl(any(ShortenUrl.class));
+
+        assertEquals("https://www.hanbit.co.kr/", response.getOriginalUrl());
     }
 }
