@@ -5,14 +5,11 @@ import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
 import com.example.shorten_url_service.infrastructure.PdfFileStorage;
-import com.example.shorten_url_service.presentation.ShortenUrlCreateRequestDto;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import com.example.shorten_url_service.presentation.ShortenUrlInformationDto;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.awt.*;
 
 @Service
 public class SimpleShortenUrlService {
@@ -26,9 +23,7 @@ public class SimpleShortenUrlService {
     }
 
     public ShortenUrlCreateResponseDto generateShortenUrl(
-            ShortenUrlCreateRequestDto shortenUrlCreateRequestDto) {
-
-        String originalUrl = shortenUrlCreateRequestDto.getOriginalUrl();
+            String originalUrl) {
 
         ShortenUrl shortenUrl = createAndSaveShortenUrl(originalUrl);
 

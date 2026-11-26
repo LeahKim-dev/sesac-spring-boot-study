@@ -3,7 +3,6 @@ package com.example.shorten_url_service.application;
 import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
-import com.example.shorten_url_service.presentation.ShortenUrlCreateRequestDto;
 import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,9 +29,8 @@ class SimpleShortenUrlServiceTest {
     @DisplayName("URL을 단축한 후 단축된 URL 키로 조회하면 원래 URL이 조회되어야 한다.")
     void 단축_URL을_생성한_후_키로_조회하면_원래_URL을_반환한다() {
         String expectedOriginalUrl = "https://www.hanbit.co.kr/";
-        ShortenUrlCreateRequestDto shortenUrlCreateRequestDto = new ShortenUrlCreateRequestDto(expectedOriginalUrl);
         ShortenUrlCreateResponseDto shortenUrlCreateResponseDto =
-                simpleShortenUrlService.generateShortenUrl(shortenUrlCreateRequestDto);
+                simpleShortenUrlService.generateShortenUrl(expectedOriginalUrl);
 
         String shortenUrlKey = shortenUrlCreateResponseDto.getShortenUrlKey();
         assertTrue(shortenUrlKey.matches("[0-9]{8}")); // 숫자 8자리인지 확인
@@ -53,10 +51,8 @@ class SimpleShortenUrlServiceTest {
 
     @Test
     void 중복_키를_저장해도_기존_URL은_유지된다() {
-        ShortenUrlCreateRequestDto request =
-                new ShortenUrlCreateRequestDto("https://www.hanbit.co.kr/");
-
-        var response = simpleShortenUrlService.generateShortenUrl(request);
+        String originalUrl = "https://www.hanbit.co.kr/";
+        var response = simpleShortenUrlService.generateShortenUrl(originalUrl);
         String shortenUrlKey = response.getShortenUrlKey();
 
         ShortenUrl duplicateUrl =
@@ -68,7 +64,7 @@ class SimpleShortenUrlServiceTest {
         ShortenUrl savedUrl =
                 shortenUrlRepository.findShortenUrlByShortenUrlKey(shortenUrlKey);
 
-        assertEquals("https://www.hanbit.co.kr/", savedUrl.getOriginalUrl());
+        assertEquals(originalUrl, savedUrl.getOriginalUrl());
     }
 }
 

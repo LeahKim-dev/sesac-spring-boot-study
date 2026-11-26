@@ -5,7 +5,6 @@ import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
 import com.example.shorten_url_service.infrastructure.PdfFileStorage;
-import com.example.shorten_url_service.presentation.ShortenUrlCreateRequestDto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,21 +28,19 @@ class SimpleShortenUrlServiceUnitTest {
     private SimpleShortenUrlService simpleShortenUrlService;
     @Test
     void 생성한_키가_모두_중복이면_예외가_발생한다() {
-        ShortenUrlCreateRequestDto request =
-                new ShortenUrlCreateRequestDto("https://www.hanbit.co.kr/");
+        String originalUrl = "https://www.hanbit.co.kr/";
         ShortenUrl existingUrl = new ShortenUrl("https://example.com/", "abc123");
 
         when(shortenUrlRepository.findShortenUrlByShortenUrlKey(anyString()))
                 .thenReturn(existingUrl);
 
         assertThrows(LackOfShortenUrlKeyException.class,
-                () -> simpleShortenUrlService.generateShortenUrl(request));
+                () -> simpleShortenUrlService.generateShortenUrl(originalUrl));
     }
 
     @Test
     void 저장_중_키가_중복되면_다시_저장한다() {
-        ShortenUrlCreateRequestDto request =
-                new ShortenUrlCreateRequestDto("https://www.hanbit.co.kr/");
+        String originalUrl = "https://www.hanbit.co.kr/";
 
         ShortenUrl existingUrl =
                 new ShortenUrl("https://example.com/", "12345678");
@@ -56,12 +53,12 @@ class SimpleShortenUrlServiceUnitTest {
                 .when(shortenUrlRepository)
                 .insertShortenUrl(any(ShortenUrl.class));
 
-        var response = simpleShortenUrlService.generateShortenUrl(request);
+        var response = simpleShortenUrlService.generateShortenUrl(originalUrl);
 
         verify(shortenUrlRepository, times(2))
                 .insertShortenUrl(any(ShortenUrl.class));
 
-        assertEquals("https://www.hanbit.co.kr/", response.getOriginalUrl());
+        assertEquals(originalUrl, response.getOriginalUrl());
     }
 
     @Test

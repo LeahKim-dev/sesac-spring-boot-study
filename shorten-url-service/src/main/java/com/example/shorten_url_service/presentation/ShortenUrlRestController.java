@@ -23,10 +23,10 @@ public class ShortenUrlRestController {
 //    1. 단축 URL 생성 API
     @PostMapping("/shortenUrl")
     public ShortenUrlCreateResponseDto createShortenUrl(
-            @Valid @RequestBody ShortenUrlCreateRequestDto shortenUrlCreateRequestDto
+            @Valid @RequestBody ShortenUrlCreateRequestDto request
             ) {
-        ShortenUrlCreateResponseDto shortenUrlCreateResponseDto = simpleShortenUrlService.generateShortenUrl(shortenUrlCreateRequestDto);
-        return shortenUrlCreateResponseDto;
+        String originalUrl = request.getOriginalUrl();
+        return simpleShortenUrlService.generateShortenUrl(originalUrl);
     }
 
 //    2. 단축 URL 리다이렉트 API
