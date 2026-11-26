@@ -5,16 +5,16 @@ import com.example.shorten_url_service.domain.ShortenUrl;
 // ShortenURl -> 생성 응답 DTO
 // 생성 결과로 원본주소와 단축키 보내기
 public class ShortenUrlCreateResponseDto {
-    private String origianlUrl;
+    private String originalUrl;
     private String shortenUrlKey;
 
     public ShortenUrlCreateResponseDto(ShortenUrl shortenUrl) {
-        this.origianlUrl = shortenUrl.getOriginalUrl();
+        this.originalUrl = shortenUrl.getOriginalUrl();
         this.shortenUrlKey = shortenUrl.getShortenUrlKey();
     }
 
     public String getOriginalUrl() {
-        return origianlUrl;
+        return originalUrl;
     }
 
     public String getShortenUrlKey() {
