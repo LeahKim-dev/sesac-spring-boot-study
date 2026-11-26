@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,6 +24,7 @@ class SimpleShortenUrlServiceTest {
 
     // 단축 URL을 생성한 후 조회 되는지
     @Test
+    @Transactional
     @DisplayName("URL을 단축한 후 단축된 URL 키로 조회하면 원래 URL이 조회되어야 한다.")
     void 단축_URL을_생성한_후_키로_조회하면_원래_URL을_반환한다() {
         String expectedOriginalUrl = "https://www.hanbit.co.kr/";
