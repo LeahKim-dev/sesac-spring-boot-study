@@ -1,6 +1,7 @@
 package com.example.shorten_url_service.presentation;
 
 import com.example.shorten_url_service.application.SimpleShortenUrlService;
+import com.example.shorten_url_service.domain.ShortenUrl;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +27,8 @@ public class ShortenUrlRestController {
             @Valid @RequestBody ShortenUrlCreateRequestDto request
             ) {
         String originalUrl = request.getOriginalUrl();
-        return simpleShortenUrlService.generateShortenUrl(originalUrl);
+        ShortenUrl shortenUrl = simpleShortenUrlService.generateShortenUrl(originalUrl);
+        return new ShortenUrlCreateResponseDto(shortenUrl);
     }
 
 //    2. 단축 URL 리다이렉트 API

@@ -1,6 +1,7 @@
 package com.example.shorten_url_service.presentation;
 
 import com.example.shorten_url_service.application.SimpleShortenUrlService;
+import com.example.shorten_url_service.domain.ShortenUrl;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -20,6 +21,10 @@ class ShortenUrlWebTest {
     void accepts2048CharactersAndRejects2049() throws Exception {
         String prefix = "https://example.com/";
         String url = prefix + "a".repeat(2048 - prefix.length());
+
+        when(service.generateShortenUrl(url))
+                .thenReturn(new ShortenUrl(url, "01234567"));
+
         submit(url).andExpect(status().isOk());
         submit(url + "a").andExpect(status().isBadRequest());
         verify(service, times(1)).generateShortenUrl(any());
@@ -28,6 +33,10 @@ class ShortenUrlWebTest {
     @Test
     void checksKoreanUrlAfterEncoding() throws Exception {
         String url = "https://example.com/" + "한".repeat(225);
+
+        when(service.generateShortenUrl(url))
+                .thenReturn(new ShortenUrl(url, "01234567"));
+
         submit(url).andExpect(status().isOk());
         submit(url + "한").andExpect(status().isBadRequest());
         verify(service, times(1)).generateShortenUrl(any());

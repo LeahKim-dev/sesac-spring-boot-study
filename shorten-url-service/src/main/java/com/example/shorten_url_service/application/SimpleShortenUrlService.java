@@ -22,12 +22,12 @@ public class SimpleShortenUrlService {
         this.pdfFileStorage = pdfFileStorage;
     }
 
-    public ShortenUrlCreateResponseDto generateShortenUrl(
+    public ShortenUrl generateShortenUrl(
             String originalUrl) {
 
         ShortenUrl shortenUrl = createAndSaveShortenUrl(originalUrl);
 
-        return new ShortenUrlCreateResponseDto(shortenUrl);
+        return shortenUrl;
     }
 
     public ShortenUrlCreateResponseDto generatePdfShortenUrl(String fileName) {
