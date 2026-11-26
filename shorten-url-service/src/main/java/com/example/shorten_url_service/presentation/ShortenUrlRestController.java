@@ -54,9 +54,11 @@ public class ShortenUrlRestController {
             HttpServletResponse response
     ) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-        ShortenUrlInformationDto shortenUrlInformationDto = simpleShortenUrlService.getShortenUrlInformationByShortenUrlKey(shortenUrlKey);
 
-        return shortenUrlInformationDto;
+        ShortenUrl shortenUrl =
+                simpleShortenUrlService.getShortenUrlInformationByShortenUrlKey(shortenUrlKey);
+
+        return new ShortenUrlInformationDto(shortenUrl);
     }
 
 }

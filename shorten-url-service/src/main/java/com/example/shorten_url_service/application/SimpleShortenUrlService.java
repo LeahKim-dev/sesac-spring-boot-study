@@ -84,10 +84,8 @@ public class SimpleShortenUrlService {
     }
 
     @Transactional(readOnly = true)
-    public ShortenUrlInformationDto getShortenUrlInformationByShortenUrlKey(String shortenUrlKey) {
-        ShortenUrl shortenUrl = findAvailableShortenUrl(shortenUrlKey);
-
-        return new ShortenUrlInformationDto(shortenUrl);
+    public ShortenUrl getShortenUrlInformationByShortenUrlKey(String shortenUrlKey) {
+        return findAvailableShortenUrl(shortenUrlKey);
     }
 
     @Transactional
