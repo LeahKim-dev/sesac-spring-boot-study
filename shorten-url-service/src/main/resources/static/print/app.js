@@ -446,7 +446,7 @@ openForm.addEventListener("submit", async (event) => {
             destinationTab.close();
         }
         accessCodeInput.readOnly = false;
-        setBusy(openForm, openButton, false, "자료 열기 →");
+        setBusy(openForm, openButton, false, "자료 열기");
     }
 });
 
