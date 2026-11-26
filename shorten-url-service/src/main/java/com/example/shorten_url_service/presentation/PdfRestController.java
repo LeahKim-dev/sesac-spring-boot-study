@@ -1,6 +1,8 @@
 package com.example.shorten_url_service.presentation;
 
+import com.example.shorten_url_service.application.PdfUploadResult;
 import com.example.shorten_url_service.application.PdfUploadService;
+import com.example.shorten_url_service.domain.ShortenUrl;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +25,14 @@ public class PdfRestController {
             @RequestParam("file") MultipartFile file) throws IOException {
 
         try {
-            return pdfUploadService.upload(file);
+            PdfUploadResult result = pdfUploadService.upload(file);
+            ShortenUrl shortenUrl = result.shortenUrl();
+
+            return new PdfUploadResponseDto(
+                    shortenUrl.getOriginalUrl(),
+                    shortenUrl.getShortenUrlKey(),
+                    result.cancelToken()
+            );
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }

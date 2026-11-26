@@ -5,7 +5,6 @@ import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
 import com.example.shorten_url_service.infrastructure.PdfFileStorage;
-import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import com.example.shorten_url_service.presentation.ShortenUrlInformationDto;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -30,12 +29,9 @@ public class SimpleShortenUrlService {
         return shortenUrl;
     }
 
-    public ShortenUrlCreateResponseDto generatePdfShortenUrl(String fileName) {
+    public ShortenUrl generatePdfShortenUrl(String fileName) {
         String originalUrl = "/pdf/" + fileName;
-
-        ShortenUrl shortenUrl = createAndSaveShortenUrl(originalUrl);
-
-        return new ShortenUrlCreateResponseDto(shortenUrl);
+        return createAndSaveShortenUrl(originalUrl);
     }
 
     private ShortenUrl createAndSaveShortenUrl(String originalUrl) {

@@ -2,7 +2,6 @@ package com.example.shorten_url_service.application;
 
 import com.example.shorten_url_service.infrastructure.PdfFileStorage;
 import com.example.shorten_url_service.domain.ShortenUrl;
-import com.example.shorten_url_service.presentation.ShortenUrlCreateResponseDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -40,11 +39,12 @@ class PdfUploadServiceTest {
         when(storage.save(file)).thenReturn(fileName);
         when(storage.createCancelToken(fileName)).thenReturn(token);
         when(shortenUrlService.generatePdfShortenUrl(fileName))
-                .thenReturn(new ShortenUrlCreateResponseDto(new ShortenUrl("/pdf/" + fileName, "01234567")));
+                .thenReturn(new ShortenUrl("/pdf/" + fileName, "01234567"));
 
-        var response = service.upload(file);
-        assertEquals("01234567", response.shortenUrlKey());
-        assertEquals("/pdf/" + fileName, response.originalUrl());
-        assertEquals(token, response.cancelToken());
+        PdfUploadResult result = service.upload(file);
+
+        assertEquals("01234567", result.shortenUrl().getShortenUrlKey());
+        assertEquals("/pdf/" + fileName, result.shortenUrl().getOriginalUrl());
+        assertEquals(token, result.cancelToken());
     }
 }
