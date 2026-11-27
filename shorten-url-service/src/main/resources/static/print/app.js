@@ -29,7 +29,7 @@ let sendMode = "pdf";
 let issuedPdf = null;
 let cancelling = false;
 const draftKey = "print-link-issued-pdf";
-const fileRoutePattern = /^\/pdf\/pdf-[0-9]+\.pdf$/;
+const fileRoutePattern = /^\/(?:pdf|pdf-bundles)\/pdf-[0-9]+\.pdf$/;
 const tokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function showMessage(element, message, state = "") {
@@ -126,32 +126,29 @@ sendForm.addEventListener("submit", async (event) => {
     let request;
 
     if (isPdf) {
-        const file = pdfFileInput.files[0];
-
-        if (!file || file.size === 0) {
+        const files = Array.from(pdfFileInput.files);
+        let error = "";
+        if (files.length === 0 || files.length > 5) {
+            error = "PDF를 1개에서 5개까지 선택해 주세요.";
+        } else if (files.some(file => file.size === 0 || file.size > maxPdfSize)) {
+            error = "비어 있지 않은 10MB 이하의 PDF를 선택해 주세요.";
+        } else if (files.reduce((sum, file) => sum + file.size, 0) > 2 * maxPdfSize) {
+            error = "선택한 PDF의 합계는 20MB까지예요.";
+        } else if (files.some(file => !file.name.toLowerCase().endsWith(".pdf")
+                && file.type !== "application/pdf")) {
+            error = "PDF 파일만 선택해 주세요.";
+        }
+        if (error) {
             pdfFileInput.setAttribute("aria-invalid", "true");
-            showMessage(sendMessage, "업로드할 PDF 파일을 선택해 주세요.", "error");
+            showMessage(sendMessage, error, "error");
             pdfFileInput.focus();
             return;
         }
-
-        if (file.size > maxPdfSize) {
-            pdfFileInput.setAttribute("aria-invalid", "true");
-            showMessage(sendMessage, "PDF는 최대 10MB까지 업로드할 수 있어요.", "error");
-            pdfFileInput.focus();
-            return;
-        }
-
-        if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
-            pdfFileInput.setAttribute("aria-invalid", "true");
-            showMessage(sendMessage, "PDF 파일을 선택해 주세요.", "error");
-            pdfFileInput.focus();
-            return;
-        }
-
         pdfFileInput.removeAttribute("aria-invalid");
         const fileData = new FormData();
-        fileData.append("file", file);
+        for (const file of files) {
+            fileData.append("file", file);
+        }
         endpoint = "/pdf";
         request = { method: "POST", body: fileData };
     } else {
@@ -188,7 +185,7 @@ sendForm.addEventListener("submit", async (event) => {
         const response = await fetch(endpoint, request);
 
         if (response.status === 413) {
-            showMessage(sendMessage, "PDF는 최대 10MB까지 업로드할 수 있어요.", "error");
+            showMessage(sendMessage, "PDF 한 개는 10MB, 전체는 20MB까지예요.", "error");
             return;
         }
 
@@ -351,7 +348,11 @@ async function restoreIssuedPdf() {
     }
 }
 
+const receivedFiles = document.getElementById("received-files");
+
 function hideOpenFallback() {
+    receivedFiles.replaceChildren();
+    receivedFiles.hidden = true;
     openFallback.hidden = true;
     openFallback.removeAttribute("href");
 }
@@ -383,22 +384,8 @@ openForm.addEventListener("submit", async (event) => {
     setBusy(openForm, openButton, true, "코드 확인 중…");
     accessCodeInput.readOnly = true;
 
-    // 사용자 클릭 시점에 새 탭을 열어 비동기 조회 후 팝업 차단되는 상황을 줄인다.
     let destinationTab = null;
     let opened = false;
-
-    try {
-        destinationTab = window.open("about:blank", "_blank");
-        if (destinationTab) {
-            destinationTab.opener = null;
-        }
-    } catch {
-        // 새 탭을 열 수 없으면 조회 성공 후 링크를 제공한다.
-        if (destinationTab && !destinationTab.closed) {
-            destinationTab.close();
-        }
-        destinationTab = null;
-    }
 
     try {
         const response = await fetch("/shortenUrl/" + code, {
@@ -422,6 +409,37 @@ openForm.addEventListener("submit", async (event) => {
         }
 
         const target = new URL("/" + code, window.location.href).href;
+        if (/^\/pdf-bundles\/pdf-[0-9]+\.pdf$/.test(data.originalUrl)) {
+            const listing = await fetch(target, { cache: "no-store" });
+            if (!listing.ok) throw new Error("파일 목록 조회 실패");
+            const documentWithFiles = new DOMParser().parseFromString(await listing.text(), "text/html");
+            const items = document.createDocumentFragment();
+            for (const source of documentWithFiles.querySelectorAll("main li a")) {
+                const href = source.getAttribute("href");
+                if (!href || !href.startsWith(data.originalUrl + "/files/") ||
+                        !/^pdf-[0-9]+\.pdf$/.test(href.slice((data.originalUrl + "/files/").length))) continue;
+                const link = document.createElement("a");
+                link.href = href;
+                link.textContent = source.textContent;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                const item = document.createElement("li");
+                item.append(link);
+                items.append(item);
+            }
+            if (!items.childElementCount) throw new Error("빈 파일 목록");
+            receivedFiles.replaceChildren(items);
+            receivedFiles.hidden = false;
+            accessCodeInput.value = "";
+            showMessage(openMessage, "열 파일을 선택하세요.", "success");
+            return;
+        }
+        try {
+            destinationTab = window.open("about:blank", "_blank");
+            if (destinationTab) destinationTab.opener = null;
+        } catch {
+            // 브라우저가 팝업을 막으면 아래의 직접 열기 링크를 제공한다.
+        }
         if (destinationTab && !destinationTab.closed) {
             try {
                 destinationTab.location.replace(target);

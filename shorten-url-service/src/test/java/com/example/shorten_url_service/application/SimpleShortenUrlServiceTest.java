@@ -1,8 +1,10 @@
 package com.example.shorten_url_service.application;
 
 import com.example.shorten_url_service.domain.NotFoundShortenUrlException;
+import com.example.shorten_url_service.domain.SavedPdfFile;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
+import com.example.shorten_url_service.infrastructure.PdfFileJpaRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +12,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,6 +25,27 @@ class SimpleShortenUrlServiceTest {
 
     @Autowired
     private ShortenUrlRepository shortenUrlRepository;
+
+    @Autowired
+    private PdfFileJpaRepository pdfFileJpaRepository;
+
+    @Test
+    @Transactional
+    void PDF_두_개를_한_코드로_조회한다() {
+        List<SavedPdfFile> files = List.of(
+                new SavedPdfFile("이력서.pdf", "pdf-test-resume.pdf"),
+                new SavedPdfFile("포트폴리오.pdf", "pdf-test-portfolio.pdf")
+        );
+
+        ShortenUrl bundle = simpleShortenUrlService.generatePdfBundle(files);
+
+        var savedFiles = pdfFileJpaRepository
+                .findAllByShortenUrl_ShortenUrlKeyOrderByIdAsc(bundle.getShortenUrlKey());
+
+        assertEquals(2, savedFiles.size());
+        assertEquals("이력서.pdf", savedFiles.get(0).getOriginalFileName());
+        assertEquals("포트폴리오.pdf", savedFiles.get(1).getOriginalFileName());
+    }
 
     // 단축 URL을 생성한 후 조회 되는지
     @Test

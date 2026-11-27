@@ -1,21 +1,25 @@
 package com.example.shorten_url_service.infrastructure;
 
+import com.example.shorten_url_service.domain.SavedPdfFile;
 import com.example.shorten_url_service.domain.ShortenUrl;
 import com.example.shorten_url_service.domain.ShortenUrlRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public class DatabaseShortenUrlRepository implements ShortenUrlRepository {
 
     private final ShortenUrlJpaRepository shortenUrlJpaRepository;
+    private final PdfFileJpaRepository pdfFileJpaRepository;
 
     public DatabaseShortenUrlRepository(
-            ShortenUrlJpaRepository shortenUrlJpaRepository
-    ) {
+            ShortenUrlJpaRepository shortenUrlJpaRepository,
+            PdfFileJpaRepository pdfFileJpaRepository) {
         this.shortenUrlJpaRepository = shortenUrlJpaRepository;
+        this.pdfFileJpaRepository = pdfFileJpaRepository;
     }
 
     // 저장
@@ -30,7 +34,6 @@ public class DatabaseShortenUrlRepository implements ShortenUrlRepository {
 
         shortenUrlJpaRepository.save(entity);
     }
-
 
     // 조회
     @Override
@@ -55,6 +58,26 @@ public class DatabaseShortenUrlRepository implements ShortenUrlRepository {
     @Override
     public void increaseRedirectCount(String shortenUrlKey) {
         shortenUrlJpaRepository.increaseRedirectCount(shortenUrlKey);
+    }
+
+    @Override
+    @Transactional
+    public void insertPdfBundle(ShortenUrl shortenUrl, List<SavedPdfFile> files) {
+        ShortenUrlEntity link = new ShortenUrlEntity(
+                shortenUrl.getOriginalUrl(),
+                shortenUrl.getShortenUrlKey(),
+                shortenUrl.getRedirectCount()
+        );
+        ShortenUrlEntity savedLink = shortenUrlJpaRepository.save(link);
+
+        for (SavedPdfFile file : files) {
+            PdfFileEntity pdf = new PdfFileEntity(
+                    savedLink,
+                    file.originalFileName(),
+                    file.storedFileName()
+            );
+            pdfFileJpaRepository.save(pdf);
+        }
     }
 
 }

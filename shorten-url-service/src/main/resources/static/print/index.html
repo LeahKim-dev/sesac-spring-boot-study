@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f6f6f2">
     <title>프린트 링크 | 휴대폰에서 PC로</title>
     <link rel="stylesheet" href="/print/styles.css?v=3">
-    <script src="/print/app.js?v=4" defer></script>
+    <script src="/print/app.js?v=6" defer></script>
 </head>
 <body>
     <header class="site-header">
@@ -43,9 +43,9 @@
 
                     <div id="pdf-fields">
                         <label for="pdf-file">PDF 선택</label>
-                        <input id="pdf-file" name="file" type="file" accept=".pdf,application/pdf"
+                        <input id="pdf-file" name="file" type="file" multiple accept=".pdf,application/pdf"
                                aria-describedby="pdf-help send-message" required>
-                        <p class="field-help" id="pdf-help">최대 10MB · 업로드 후 10분 동안 열 수 있어요.</p>
+                        <p class="field-help" id="pdf-help">최대 5개 · 파일당 10MB · 합계 20MB · 업로드 후 10분 동안 열 수 있어요.</p>
                     </div>
 
                     <div id="link-fields" hidden>
@@ -98,6 +98,7 @@
                     <p class="form-message" id="open-message" aria-live="polite" hidden></p>
                     <a class="button secondary open-fallback" id="open-fallback" target="_blank" rel="noopener noreferrer" hidden>새 탭에서 자료 열기 ↗</a>
                 </form>
+                <ul id="received-files" aria-label="받은 PDF 목록" hidden></ul>
                 <p class="pc-note">자료는 새 탭에서 열려요. 브라우저에서 출력한 뒤 이 화면으로 돌아오세요.</p>
             </article>
         </section>

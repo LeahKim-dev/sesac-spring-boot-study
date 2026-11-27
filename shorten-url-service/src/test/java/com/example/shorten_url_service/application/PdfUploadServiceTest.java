@@ -16,7 +16,7 @@ class PdfUploadServiceTest {
     void removesFileWhenKeyIssuingFails() throws Exception {
         PdfFileStorage storage = mock(PdfFileStorage.class);
         SimpleShortenUrlService shortenUrlService = mock(SimpleShortenUrlService.class);
-        PdfUploadService service = new PdfUploadService(storage, shortenUrlService);
+        PdfUploadService service = new PdfUploadService(storage, shortenUrlService, mock(), mock());
         MockMultipartFile file = new MockMultipartFile("file", new byte[]{1});
         RuntimeException failure = new IllegalStateException("database unavailable");
 
@@ -31,7 +31,7 @@ class PdfUploadServiceTest {
     void issuesCancelTokenWithThePdfCode() throws Exception {
         PdfFileStorage storage = mock(PdfFileStorage.class);
         SimpleShortenUrlService shortenUrlService = mock(SimpleShortenUrlService.class);
-        PdfUploadService service = new PdfUploadService(storage, shortenUrlService);
+        PdfUploadService service = new PdfUploadService(storage, shortenUrlService, mock(), mock());
         MockMultipartFile file = new MockMultipartFile("file", new byte[]{1});
         String fileName = "pdf-123.pdf";
         String token = "12345678-1234-1234-1234-123456789abc";
@@ -46,5 +46,36 @@ class PdfUploadServiceTest {
         assertEquals("01234567", result.shortenUrl().getShortenUrlKey());
         assertEquals("/pdf/" + fileName, result.shortenUrl().getOriginalUrl());
         assertEquals(token, result.cancelToken());
+    }
+
+    @Test
+    void removesEarlierFilesWhenAnotherFileFails() throws Exception {
+        PdfFileStorage storage = mock();
+        SimpleShortenUrlService links = mock();
+        PdfUploadService service = new PdfUploadService(storage, links, mock(), mock());
+        var first = new MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
+        var second = new MockMultipartFile("file", "b.pdf", "application/pdf", new byte[]{2});
+        when(storage.save(first)).thenReturn("pdf-1.pdf");
+        when(storage.save(second)).thenThrow(new java.io.IOException("write failed"));
+
+        assertThrows(java.io.IOException.class, () -> service.uploadBundle(java.util.List.of(first, second)));
+        verify(storage).delete("pdf-1.pdf");
+        verifyNoInteractions(links);
+    }
+
+    @Test
+    void removesEveryFileWhenBundleRegistrationFails() throws Exception {
+        PdfFileStorage storage = mock();
+        SimpleShortenUrlService links = mock();
+        PdfUploadService service = new PdfUploadService(storage, links, mock(), mock());
+        var first = new MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
+        var second = new MockMultipartFile("file", "b.pdf", "application/pdf", new byte[]{2});
+        when(storage.save(first)).thenReturn("pdf-1.pdf");
+        when(storage.save(second)).thenReturn("pdf-2.pdf");
+        when(links.generatePdfBundle(anyList())).thenThrow(new IllegalStateException("database unavailable"));
+
+        assertThrows(IllegalStateException.class, () -> service.uploadBundle(java.util.List.of(first, second)));
+        verify(storage).delete("pdf-1.pdf");
+        verify(storage).delete("pdf-2.pdf");
     }
 }
