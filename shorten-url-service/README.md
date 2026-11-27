@@ -2,7 +2,7 @@
 
 휴대폰에 있는 PDF나 웹 링크를 공용 PC에서 숫자 8자리 코드로 열 수 있는 단축 URL 서비스입니다.
 
-**[서비스 바로가기](https://sesac-spring-boot-study-production.up.railway.app/)**
+**[서비스 바로가기](https://ezprint.up.railway.app/)**
 
 ## 1. 기획 배경
 
@@ -202,6 +202,6 @@ $env:SHORTEN_URL_DB_PASSWORD = [System.Net.NetworkCredential]::new('', $password
 
 Railway에서 Java 21 Docker 컨테이너와 MySQL 서비스를 실행합니다. `deploy` 프로필은 환경 변수로 DB 접속 정보를 전달받고, 스키마 초기화 SQL을 적용한 후 JPA 매핑을 검증합니다.
 
-[프린트 링크 공개 데모](https://sesac-spring-boot-study-production.up.railway.app/)
+[프린트 링크 공개 데모](https://ezprint.up.railway.app/)
 
 현재 발표용 무료 체험으로 운영하며, 제공되는 크레딧이나 체험 기간이 종료되면 서비스 이용이 중단될 수 있습니다.
