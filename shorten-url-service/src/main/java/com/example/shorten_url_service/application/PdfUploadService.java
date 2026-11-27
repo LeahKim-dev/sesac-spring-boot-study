@@ -89,9 +89,14 @@ public class PdfUploadService {
     }
 
     public PdfUploadResult upload(MultipartFile file) throws IOException {
+        return upload(file, null);
+    }
+
+    public PdfUploadResult upload(MultipartFile file, String pin) throws IOException {
         String fileName = pdfFileStorage.save(file);
 
         try {
+            if (pin != null) pdfFileStorage.protect(fileName, pin);
             String cancelToken = pdfFileStorage.createCancelToken(fileName);
             ShortenUrl shortenUrl = simpleShortenUrlService.generatePdfShortenUrl(fileName);
             return new PdfUploadResult(shortenUrl, cancelToken);
@@ -106,11 +111,16 @@ public class PdfUploadService {
     }
 
     public PdfUploadResult uploadBundle(List<MultipartFile> files) throws IOException {
+        return uploadBundle(files, null);
+    }
+
+    public PdfUploadResult uploadBundle(List<MultipartFile> files, String pin) throws IOException {
         List<SavedPdfFile> savedFiles = new ArrayList<>();
         saveUploadFiles(files, savedFiles);
 
         try {
             String bundleId = savedFiles.getFirst().storedFileName();
+            if (pin != null) pdfFileStorage.protect(bundleId, pin);
             String cancelToken = pdfFileStorage.createCancelToken(bundleId);
             ShortenUrl shortenUrl = simpleShortenUrlService.generatePdfBundle(savedFiles);
 

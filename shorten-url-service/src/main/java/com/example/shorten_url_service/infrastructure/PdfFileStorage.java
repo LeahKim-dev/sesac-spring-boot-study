@@ -92,6 +92,46 @@ public class PdfFileStorage {
         return token;
     }
 
+    public void protect(String fileName, String pin) throws IOException {
+        if (pin == null || !pin.matches("[0-9]{4}")) {
+            throw new IllegalArgumentException("PIN은 숫자 4자리로 입력하세요.");
+        }
+        byte[] salt = new byte[16];
+        new java.security.SecureRandom().nextBytes(salt);
+        byte[] record = java.nio.ByteBuffer.allocate(48).put(salt).put(pinHash(pin, salt)).array();
+        Files.write(directory.resolve(fileName + ".pin"), record, java.nio.file.StandardOpenOption.CREATE_NEW);
+    }
+
+    private byte[] pinHash(String pin, byte[] salt) {
+        var spec = new javax.crypto.spec.PBEKeySpec(pin.toCharArray(), salt, 210_000, 256);
+        try {
+            return javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();
+        } catch (java.security.GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        } finally {
+            spec.clearPassword();
+        }
+    }
+
+    public boolean requiresPin(String name) {
+        return isPdfFileName(name) && !Files.notExists(directory.resolve(name + ".pin"));
+    }
+
+    private final java.util.concurrent.ConcurrentMap<String, Integer> failures =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public boolean verifyPin(String name, String pin) throws IOException {
+        if (load(name) == null || pin == null || !pin.matches("[0-9]{4}")) return false;
+        byte[] record = Files.readAllBytes(directory.resolve(name + ".pin"));
+        // Reserve an attempt before hashing so simultaneous requests share the limit.
+        if (failures.merge(name, 1, (count, one) -> Math.min(count + 1, 6)) > 5) return false;
+        boolean valid = record.length == 48 && MessageDigest.isEqual(
+                java.util.Arrays.copyOfRange(record, 16, 48),
+                pinHash(pin, java.util.Arrays.copyOf(record, 16)));
+        if (valid) failures.remove(name);
+        return valid;
+    }
+
     public boolean cancel(String fileName, String token) throws IOException {
         if (!isPdfFileName(fileName) || token == null || token.length() != 36) {
             return false;
@@ -118,6 +158,8 @@ public class PdfFileStorage {
         }
         Files.deleteIfExists(directory.resolve(fileName));
         Files.deleteIfExists(directory.resolve(fileName + ".cancel"));
+        Files.deleteIfExists(directory.resolve(fileName + ".pin"));
+        failures.remove(fileName);
     }
 
     private byte[] hashToken(String token) {

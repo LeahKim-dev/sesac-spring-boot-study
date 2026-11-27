@@ -14,6 +14,20 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PdfFileStorageTest {
+    @Test
+    void locksAfterFiveIncorrectPins() throws Exception {
+        PdfFileStorage storage = new PdfFileStorage(directory);
+        String file = storage.save(pdf());
+        storage.protect(file, "0123");
+        assertTrue(storage.verifyPin(file, "0123"));
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertFalse(storage.verifyPin(file, "1234"));
+        }
+        assertFalse(storage.verifyPin(file, "0123"));
+        storage.delete(file);
+        assertFalse(storage.requiresPin(file));
+    }
+
 
     @TempDir
     Path directory;

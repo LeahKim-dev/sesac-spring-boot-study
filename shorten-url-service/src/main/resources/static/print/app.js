@@ -145,7 +145,14 @@ sendForm.addEventListener("submit", async (event) => {
             return;
         }
         pdfFileInput.removeAttribute("aria-invalid");
+        const pin = document.getElementById("send-pin").value;
+        if (!/^[0-9]{4}$/.test(pin)) {
+            showMessage(sendMessage, "열람 PIN을 숫자 4자리로 입력하세요.", "error");
+            document.getElementById("send-pin").focus();
+            return;
+        }
         const fileData = new FormData();
+        fileData.append("pin", pin);
         for (const file of files) {
             fileData.append("file", file);
         }
@@ -408,6 +415,20 @@ openForm.addEventListener("submit", async (event) => {
             throw new Error("잘못된 응답");
         }
 
+        if (fileRoutePattern.test(data.originalUrl)) {
+            const pinInput = document.getElementById("receive-pin");
+            const name = data.originalUrl.split("/").pop();
+            const access = await fetch("/pdf-access/" + encodeURIComponent(name), {
+                method: "POST", body: new URLSearchParams({ pin: pinInput.value }), cache: "no-store"
+            });
+            if (access.status === 403) {
+                showMessage(openMessage, "PIN을 확인하세요. 5회 실패하면 새 코드를 발급받아야 해요.", "error");
+                pinInput.focus();
+                return;
+            }
+            if (!access.ok) throw new Error("자료를 열 수 없습니다.");
+            pinInput.value = "";
+        }
         const target = new URL("/" + code, window.location.href).href;
         if (/^\/pdf-bundles\/pdf-[0-9]+\.pdf$/.test(data.originalUrl)) {
             const listing = await fetch(target, { cache: "no-store" });

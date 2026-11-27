@@ -19,19 +19,26 @@ public class PdfRestController {
 
     private final PdfUploadService pdfUploadService;
 
-    public PdfRestController(PdfUploadService pdfUploadService) {
+    private final com.example.shorten_url_service.infrastructure.PdfFileStorage storage;
+
+    public PdfRestController(PdfUploadService pdfUploadService,
+            com.example.shorten_url_service.infrastructure.PdfFileStorage storage) {
+        this.storage = storage;
         this.pdfUploadService = pdfUploadService;
     }
 
     @PostMapping(value = "/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public PdfUploadResponseDto upload(
-            @RequestParam("file") List<MultipartFile> files) throws IOException {
+            @RequestParam("file") List<MultipartFile> files, @RequestParam("pin") String pin, jakarta.servlet.http.HttpServletRequest request) throws IOException {
 
         try {
+            if (!pin.matches("[0-9]{4}")) throw new IllegalArgumentException("숫자 4자리 PIN을 입력하세요.");
             PdfUploadResult result = files.size() == 1
-                    ? pdfUploadService.upload(files.getFirst())
-                    : pdfUploadService.uploadBundle(files);
+                    ? pdfUploadService.upload(files.getFirst(), pin)
+                    : pdfUploadService.uploadBundle(files, pin);
             ShortenUrl shortenUrl = result.shortenUrl();
+            String path = shortenUrl.getOriginalUrl();
+            request.getSession().setAttribute("pdf-access:" + path.substring(path.lastIndexOf('/') + 1), Boolean.TRUE);
 
             return new PdfUploadResponseDto(
                     shortenUrl.getOriginalUrl(),
@@ -43,8 +50,25 @@ public class PdfRestController {
         }
     }
 
+    @PostMapping("/pdf-access/{name}")
+    public ResponseEntity<Void> unlock(@PathVariable String name, @RequestParam(defaultValue = "") String pin,
+                                       jakarta.servlet.http.HttpServletRequest request) throws IOException {
+        if (storage.load(name) == null) return ResponseEntity.notFound().build();
+        if (allowed(name, request)) return ResponseEntity.noContent().build();
+        if (!storage.verifyPin(name, pin)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        request.getSession().setAttribute("pdf-access:" + name, Boolean.TRUE);
+        return ResponseEntity.noContent().build();
+    }
+
+    private boolean allowed(String name, jakarta.servlet.http.HttpServletRequest request) {
+        var session = request.getSession(false);
+        return !storage.requiresPin(name) || (session != null &&
+                Boolean.TRUE.equals(session.getAttribute("pdf-access:" + name)));
+    }
+
     @GetMapping(value = "/pdf-bundles/{bundleId}", produces = "text/html;charset=UTF-8")
-    public ResponseEntity<String> listBundle(@PathVariable String bundleId) {
+    public ResponseEntity<String> listBundle(@PathVariable String bundleId, jakarta.servlet.http.HttpServletRequest request) {
+        if (!allowed(bundleId, request)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         List<SavedPdfFile> files = pdfUploadService.listBundle(bundleId);
         if (files.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -68,7 +92,8 @@ public class PdfRestController {
 
     @GetMapping("/pdf-bundles/{bundleId}/files/{fileName}")
     public ResponseEntity<Resource> getBundleFile(@PathVariable String bundleId,
-                                                  @PathVariable String fileName) {
+                                                  @PathVariable String fileName, jakarta.servlet.http.HttpServletRequest request) {
+        if (!allowed(bundleId, request)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return pdfResponse(pdfUploadService.getBundleFile(bundleId, fileName));
     }
 
@@ -92,7 +117,8 @@ public class PdfRestController {
 
     @GetMapping("/pdf/{fileName}")
     public ResponseEntity<Resource> getPdf(
-            @PathVariable String fileName) {
+            @PathVariable String fileName, jakarta.servlet.http.HttpServletRequest request) {
+        if (!allowed(fileName, request)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         return pdfResponse(pdfUploadService.getPdf(fileName));
     }

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f6f6f2">
     <title>프린트 링크 | 휴대폰에서 PC로</title>
     <link rel="stylesheet" href="/print/styles.css?v=3">
-    <script src="/print/app.js?v=6" defer></script>
+    <script src="/print/app.js?v=8" defer></script>
 </head>
 <body>
     <header class="site-header">
@@ -42,6 +42,9 @@
                     </div>
 
                     <div id="pdf-fields">
+                        <label for="send-pin">열람 PIN (숫자 4자리)</label>
+                        <input id="send-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+                        <p class="field-help">받는 사람에게 코드와 PIN을 함께 알려주세요.</p>
                         <label for="pdf-file">PDF 선택</label>
                         <input id="pdf-file" name="file" type="file" multiple accept=".pdf,application/pdf"
                                aria-describedby="pdf-help send-message" required>
@@ -94,6 +97,8 @@
                            type="text" inputmode="numeric" pattern="[0-9]{8}"
                            placeholder="00000000" autocomplete="off"
                            aria-describedby="open-message" required>
+                    <label for="receive-pin">PDF 열람 PIN</label>
+                    <input id="receive-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="웹 링크는 비워 두세요">
                     <button class="button primary" id="open-button" type="submit">자료 열기</button>
                     <p class="form-message" id="open-message" aria-live="polite" hidden></p>
                     <a class="button secondary open-fallback" id="open-fallback" target="_blank" rel="noopener noreferrer" hidden>새 탭에서 자료 열기 ↗</a>
