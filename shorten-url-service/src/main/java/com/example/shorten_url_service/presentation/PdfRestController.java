@@ -29,7 +29,7 @@ public class PdfRestController {
 
     @PostMapping(value = "/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public PdfUploadResponseDto upload(
-            @RequestParam("file") List<MultipartFile> files, @RequestParam("pin") String pin, jakarta.servlet.http.HttpServletRequest request) throws IOException {
+            @RequestParam("file") List<MultipartFile> files, @RequestParam("pin") String pin) throws IOException {
 
         try {
             if (!pin.matches("[0-9]{4}")) throw new IllegalArgumentException("숫자 4자리 PIN을 입력하세요.");
@@ -37,8 +37,6 @@ public class PdfRestController {
                     ? pdfUploadService.upload(files.getFirst(), pin)
                     : pdfUploadService.uploadBundle(files, pin);
             ShortenUrl shortenUrl = result.shortenUrl();
-            String path = shortenUrl.getOriginalUrl();
-            request.getSession().setAttribute("pdf-access:" + path.substring(path.lastIndexOf('/') + 1), Boolean.TRUE);
 
             return new PdfUploadResponseDto(
                     shortenUrl.getOriginalUrl(),
@@ -54,16 +52,17 @@ public class PdfRestController {
     public ResponseEntity<Void> unlock(@PathVariable String name, @RequestParam(defaultValue = "") String pin,
                                        jakarta.servlet.http.HttpServletRequest request) throws IOException {
         if (storage.load(name) == null) return ResponseEntity.notFound().build();
-        if (allowed(name, request)) return ResponseEntity.noContent().build();
+        if (!storage.requiresPin(name)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         if (!storage.verifyPin(name, pin)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         request.getSession().setAttribute("pdf-access:" + name, Boolean.TRUE);
         return ResponseEntity.noContent().build();
     }
 
     private boolean allowed(String name, jakarta.servlet.http.HttpServletRequest request) {
+        if (storage.load(name) == null) return true;
         var session = request.getSession(false);
-        return !storage.requiresPin(name) || (session != null &&
-                Boolean.TRUE.equals(session.getAttribute("pdf-access:" + name)));
+        return session != null &&
+                Boolean.TRUE.equals(session.getAttribute("pdf-access:" + name));
     }
 
     @GetMapping(value = "/pdf-bundles/{bundleId}", produces = "text/html;charset=UTF-8")

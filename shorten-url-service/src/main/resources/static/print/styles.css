@@ -541,3 +541,15 @@ input[type="file"]::file-selector-button {
         letter-spacing: 0.12em;
     }
 }
+
+.pin-digits {
+    display: flex;
+    gap: .5rem;
+    margin: .35rem 0 .75rem;
+}
+.pin-digits input {
+    width: 2.8rem;
+    padding-inline: 0;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}

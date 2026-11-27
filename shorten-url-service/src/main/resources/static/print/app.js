@@ -1,3 +1,49 @@
+function pinFields(id) {
+    const fields = Array.from(document.querySelectorAll("#" + id + " input"));
+    function fill(start, text) {
+        const digits = text.replace(/[^0-9]/g, "");
+        if (!digits) return;
+        const count = Math.min(digits.length, fields.length - start);
+        for (let offset = 0; offset < count; offset++) {
+            fields[start + offset].value = digits[offset];
+        }
+        if (fields[start + count]) fields[start + count].focus();
+    }
+    fields.forEach((field, index) => {
+        field.addEventListener("focus", () => field.select());
+        field.addEventListener("input", () => {
+            const text = field.value;
+            field.value = "";
+            fill(index, text);
+        });
+        field.addEventListener("paste", event => {
+            event.preventDefault();
+            const text = event.clipboardData.getData("text");
+            fill(text.replace(/[^0-9]/g, "").length === 4 ? 0 : index, text);
+        });
+        field.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                field.form.requestSubmit(field.form.querySelector('button[type="submit"]'));
+                return;
+            }
+            if (event.key === "Backspace" && !field.value && index > 0) {
+                event.preventDefault();
+                fields[index - 1].value = "";
+                fields[index - 1].focus();
+            }
+        });
+    });
+    return {
+        get value() { return fields.map(field => field.value).join(""); },
+        clear() { fields.forEach(field => { field.value = ""; }); },
+        focus() { (fields.find(field => !field.value) || fields[0]).focus(); }
+    };
+}
+
+const sendPin = pinFields("send-pin");
+const receivePin = pinFields("receive-pin");
+
 const sendForm = document.getElementById("send-form");
 const originalUrlInput = document.getElementById("original-url");
 const pdfFileInput = document.getElementById("pdf-file");
@@ -145,10 +191,10 @@ sendForm.addEventListener("submit", async (event) => {
             return;
         }
         pdfFileInput.removeAttribute("aria-invalid");
-        const pin = document.getElementById("send-pin").value;
+        const pin = sendPin.value;
         if (!/^[0-9]{4}$/.test(pin)) {
             showMessage(sendMessage, "열람 PIN을 숫자 4자리로 입력하세요.", "error");
-            document.getElementById("send-pin").focus();
+            sendPin.focus();
             return;
         }
         const fileData = new FormData();
@@ -245,6 +291,10 @@ originalUrlInput.addEventListener("input", () => {
 });
 
 pdfFileInput.addEventListener("change", () => {
+    if (pdfFileInput.files.length) {
+        sendPin.clear();
+        sendPin.focus();
+    }
     pdfFileInput.removeAttribute("aria-invalid");
     showMessage(sendMessage, "");
 });
@@ -364,7 +414,16 @@ function hideOpenFallback() {
     openFallback.removeAttribute("href");
 }
 
+previewLink.addEventListener("click", event => {
+    if (!issuedPdf) return;
+    event.preventDefault();
+    accessCodeInput.value = issuedPdf.code;
+    accessCodeInput.dispatchEvent(new Event("input"));
+});
+
 accessCodeInput.addEventListener("input", () => {
+    receivePin.clear();
+    if (codePattern.test(accessCodeInput.value)) receivePin.focus();
     accessCodeInput.removeAttribute("aria-invalid");
     showMessage(openMessage, "");
     hideOpenFallback();
@@ -416,7 +475,12 @@ openForm.addEventListener("submit", async (event) => {
         }
 
         if (fileRoutePattern.test(data.originalUrl)) {
-            const pinInput = document.getElementById("receive-pin");
+            const pinInput = receivePin;
+            if (!/^[0-9]{4}$/.test(pinInput.value)) {
+                showMessage(openMessage, "PDF 열람 PIN 네 자리를 입력하세요.", "error");
+                pinInput.focus();
+                return;
+            }
             const name = data.originalUrl.split("/").pop();
             const access = await fetch("/pdf-access/" + encodeURIComponent(name), {
                 method: "POST", body: new URLSearchParams({ pin: pinInput.value }), cache: "no-store"
@@ -427,7 +491,7 @@ openForm.addEventListener("submit", async (event) => {
                 return;
             }
             if (!access.ok) throw new Error("자료를 열 수 없습니다.");
-            pinInput.value = "";
+            pinInput.clear();
         }
         const target = new URL("/" + code, window.location.href).href;
         if (/^\/pdf-bundles\/pdf-[0-9]+\.pdf$/.test(data.originalUrl)) {

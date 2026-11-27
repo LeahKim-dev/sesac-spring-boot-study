@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f6f6f2">
     <title>프린트 링크 | 휴대폰에서 PC로</title>
-    <link rel="stylesheet" href="/print/styles.css?v=3">
-    <script src="/print/app.js?v=8" defer></script>
+    <link rel="stylesheet" href="/print/styles.css?v=4">
+    <script src="/print/app.js?v=10" defer></script>
 </head>
 <body>
     <header class="site-header">
@@ -42,13 +42,18 @@
                     </div>
 
                     <div id="pdf-fields">
-                        <label for="send-pin">열람 PIN (숫자 4자리)</label>
-                        <input id="send-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
-                        <p class="field-help">받는 사람에게 코드와 PIN을 함께 알려주세요.</p>
                         <label for="pdf-file">PDF 선택</label>
                         <input id="pdf-file" name="file" type="file" multiple accept=".pdf,application/pdf"
                                aria-describedby="pdf-help send-message" required>
                         <p class="field-help" id="pdf-help">최대 5개 · 파일당 10MB · 합계 20MB · 업로드 후 10분 동안 열 수 있어요.</p>
+                        <span id="send-pin-label">열람 PIN (숫자 4자리)</span>
+                        <div class="pin-digits" id="send-pin" role="group" aria-labelledby="send-pin-label">
+                            <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="1번째 숫자">
+                            <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="2번째 숫자">
+                            <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="3번째 숫자">
+                            <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="4번째 숫자">
+                        </div>
+                        <p class="field-help">받는 사람에게 코드와 PIN을 함께 알려주세요.</p>
                     </div>
 
                     <div id="link-fields" hidden>
@@ -97,8 +102,13 @@
                            type="text" inputmode="numeric" pattern="[0-9]{8}"
                            placeholder="00000000" autocomplete="off"
                            aria-describedby="open-message" required>
-                    <label for="receive-pin">PDF 열람 PIN</label>
-                    <input id="receive-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="웹 링크는 비워 두세요">
+                    <span id="receive-pin-label">PDF 열람 PIN (웹 링크는 생략)</span>
+                    <div class="pin-digits" id="receive-pin" role="group" aria-labelledby="receive-pin-label">
+                        <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="1번째 숫자">
+                        <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="2번째 숫자">
+                        <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="3번째 숫자">
+                        <input type="text" inputmode="numeric" pattern="[0-9]" autocomplete="off" aria-label="4번째 숫자">
+                    </div>
                     <button class="button primary" id="open-button" type="submit">자료 열기</button>
                     <p class="form-message" id="open-message" aria-live="polite" hidden></p>
                     <a class="button secondary open-fallback" id="open-fallback" target="_blank" rel="noopener noreferrer" hidden>새 탭에서 자료 열기 ↗</a>
